@@ -26,7 +26,9 @@
 
 #include "mdef.h"
 
+#ifndef __CYGWIN__
 #include <execinfo.h>
+#endif
 #include <signal.h>
 
 #include "gtm_stdlib.h"
