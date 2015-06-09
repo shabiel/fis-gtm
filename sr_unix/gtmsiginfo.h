@@ -21,6 +21,9 @@
 #ifdef __linux__
 #  include <ucontext.h>
 #endif
+#ifdef __CYGWIN__
+#  include <ucontext.h>
+#endif
 
 typedef struct
 {
@@ -42,8 +45,6 @@ typedef struct
 
 #if defined(__osf__)
 typedef	struct sigcontext	gtm_sigcontext_t;
-#elif defined(__CYGWIN__)
-typedef	struct ucontext		gtm_sigcontext_t;
 #elif defined(_AIX)
 typedef struct sigcontext64	gtm_sigcontext_t;
 #else
