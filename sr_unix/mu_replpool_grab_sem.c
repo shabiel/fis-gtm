@@ -114,7 +114,11 @@ error_def(ERR_TEXT);
 int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, boolean_t *sem_created_ptr, boolean_t immediate)
 {
 	int			status, save_errno, sem_id, semval, semnum, instfilelen;
+	#ifdef __CYGWIN__
+	time_t		sem_ctime_cyg;
+	#else
 	time_t			sem_ctime;
+	#endif
 	boolean_t		sem_created, force_increment;
 	char			*instfilename;
 	union semun		semarg;
@@ -138,15 +142,27 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 	if (JNLPOOL_SEGMENT == pool_type)
 	{
 		sem_id = repl_inst_filehdr->jnlpool_semid;
+		#ifdef __CYGWIN__
+		sem_ctime_cyg = repl_inst_filehdr->jnlpool_semid_ctime;
+		#else
 		sem_ctime = repl_inst_filehdr->jnlpool_semid_ctime;
+		#endif
 	}
 	else
 	{
 		sem_id = repl_inst_filehdr->recvpool_semid;
+		#ifdef __CYGWIN__
+		sem_ctime_cyg = repl_inst_filehdr->recvpool_semid_ctime;
+		#else
 		sem_ctime = repl_inst_filehdr->recvpool_semid_ctime;
+		#endif
 	}
 	semarg.buf = &semstat;
+	#ifdef __CYGWIN__
+	if ((INVALID_SEMID == sem_id) || (-1 == semctl(sem_id, 0, IPC_STAT, semarg)) || (sem_ctime_cyg != semarg.buf->sem_ctime))
+	#else
 	if ((INVALID_SEMID == sem_id) || (-1 == semctl(sem_id, 0, IPC_STAT, semarg)) || (sem_ctime != semarg.buf->sem_ctime))
+	#endif
 	{	/* Semaphore doesn't exist. Create new ones */
 		if (JNLPOOL_SEGMENT == pool_type)
 		{
@@ -177,7 +193,11 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 			save_errno = errno;
 			DO_CLNUP_AND_RETURN(save_errno, sem_created, pool_type, instfilename, instfilelen, sem_id, "semctl()");
 		}
+		#ifdef __CYGWIN__
+		sem_ctime_cyg = semarg.buf->sem_ctime;
+		#else
 		sem_ctime = semarg.buf->sem_ctime;
+		#endif
 	} else if (JNLPOOL_SEGMENT == pool_type)
 		set_sem_set_src(sem_id);
 	else
@@ -220,7 +240,11 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 		}
 		holds_sem[SOURCE][SRC_SERV_COUNT_SEM] = TRUE;
 		repl_inst_filehdr->jnlpool_semid = sem_id;
+		#ifdef __CYGWIN__
+		repl_inst_filehdr->jnlpool_semid_ctime = sem_ctime_cyg;
+		#else
 		repl_inst_filehdr->jnlpool_semid_ctime = sem_ctime;
+		#endif
 	}
 	else
 	{
@@ -286,7 +310,11 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 			holds_sem[RECV][semnum] = TRUE;
 		}
 		repl_inst_filehdr->recvpool_semid = sem_id;
+		#ifdef __CYGWIN__
+		repl_inst_filehdr->recvpool_semid_ctime = sem_ctime_cyg;
+		#else
 		repl_inst_filehdr->recvpool_semid_ctime = sem_ctime;
+		#endif
 	}
 	return SS_NORMAL;
 }
