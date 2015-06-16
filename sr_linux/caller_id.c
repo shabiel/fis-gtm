@@ -73,7 +73,11 @@ caddr_t caller_id(void)
 	if (blocksig_initialized)
         	sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
 	caller_id_reent = TRUE;
+	#ifndef __CYGWIN__
 	trace_size = backtrace(trace, MAX_TRACE_DEPTH);
+	#else
+	trace_size = 0;
+	#endif
 	caller_id_reent = FALSE;
 	if (blocksig_initialized)
 		sigprocmask(SIG_SETMASK, &savemask, NULL);
