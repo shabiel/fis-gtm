@@ -34,9 +34,12 @@ endif()
 set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
 
 # Compiler
+# Cygwin must have -ansi undefined (it adds __STRICT_ANSI__ which undefines some important prototypes like fdopen())
+# See http://stackoverflow.com/questions/21689124/mkstemp-and-fdopen-in-cygwin-1-7-28
+# Cygwin warns if you add -fPIC that the compiled code is already position independent. So don't add -fPIC
 if(${CYGWIN})
   set(CMAKE_C_FLAGS
-    "${CMAKE_C_FLAGS} -U__STRICT_ANSI__ -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
+    "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
 else()
 set(CMAKE_C_FLAGS
   "${CMAKE_C_FLAGS} -ansi -fsigned-char -fPIC -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
