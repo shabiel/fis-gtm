@@ -36,7 +36,7 @@ set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
 # Compiler
 if(${CYGWIN})
   set(CMAKE_C_FLAGS
-    "${CMAKE_C_FLAGS} -ansi -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
+    "${CMAKE_C_FLAGS} -U__STRICT_ANSI__ -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
 else()
 set(CMAKE_C_FLAGS
   "${CMAKE_C_FLAGS} -ansi -fsigned-char -fPIC -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
