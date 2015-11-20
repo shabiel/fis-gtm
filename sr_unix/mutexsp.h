@@ -44,6 +44,7 @@
 
 #define HUNDRED_MSEC 			100000
 #define E_4				10000
+#define ONE_MILLION 			1000000
 
 typedef struct
 {
