@@ -497,87 +497,99 @@ add_dependencies(libgtmshr gen_export)
 add_dependencies(mumps libgtmshr)
 
 # Iterate over the list of GPG related libraries
-foreach(gpglib gpg-error gpgme gcrypt config)
+if(GTM_ENABLE_ENCRYPTION)
+  foreach(gpglib gpg-error gpgme gcrypt config)
   # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
   find_library(GPGLIB_${gpglib} NAME ${gpglib} PATHS ${CMAKE_LIBRARY_PATH})
   # Append the found library to the list
   set(GPG_LIBRARIES ${GPG_LIBRARIES} ${GPGLIB_${gpglib}})
-endforeach()
+  endforeach()
+endif()
 
 # Iterate over the list of SSL related libraries
-foreach(tlslib ssl crypto config)
+if(GTM_ENABLE_ENCRYPTION)
+  foreach(tlslib ssl crypto config)
   # For each library, we need a new CMake variable, hence TLSLIB_${tlslib}
   find_library(TLSLIB_${tlslib} NAME ${tlslib} PATHS ${CMAKE_LIBRARY_PATH})
   # Append the found library to the list
   set(TLS_LIBRARIES ${TLS_LIBRARIES} ${TLSLIB_${tlslib}})
-endforeach()
+  endforeach()
+endif()
 
 # Building the three encryption libraries could by a loop of some sort, but
 # manually creating each target is way easier.
 
 # Library=GCRYPT Algorithm=AES256CFB
-include_directories (/usr/local/ssl/include)
-add_library(libgtmcrypt_gcrypt_AES256CFB.so MODULE ${libgtmcrypt_SOURCES})
-set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
+if(GTM_ENABLE_ENCRYPTION)
+  include_directories (/usr/local/ssl/include)
+  add_library(libgtmcrypt_gcrypt_AES256CFB.so MODULE ${libgtmcrypt_SOURCES})
+  set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
   OUTPUT_NAME gtmcrypt_gcrypt_AES256CFB
   COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
-add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so gen_gtm_threadgbl_deftypes)
-target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES})
-install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${GTM_INSTALL_DIR}/plugin)
+  add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so gen_gtm_threadgbl_deftypes)
+  target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES})
+  install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${GTM_INSTALL_DIR}/plugin)
+endif()
 
 # Establish the default encryption link
-set(default_encr_link   ${GTM_BINARY_DIR}/plugin/libgtmcrypt.so)
-set(default_encr_target libgtmcrypt_gcrypt_AES256CFB.so)
-add_custom_command(
+if(GTM_ENABLE_ENCRYPTION)
+  set(default_encr_link   ${GTM_BINARY_DIR}/plugin/libgtmcrypt.so)
+  set(default_encr_target libgtmcrypt_gcrypt_AES256CFB.so)
+  add_custom_command(
 	OUTPUT ${default_encr_link}
 	COMMAND ${CMAKE_COMMAND} -E create_symlink "${default_encr_target}" "${default_encr_link}"
 	DEPENDS ${GTM_BINARY_DIR}/plugin/${default_encr_target}
 	COMMENT "Generating default_encr symbolic link"
 	)
-add_custom_target(install_default_encr ALL DEPENDS ${default_encr_link})
-install(FILES ${default_encr_link} DESTINATION ${GTM_INSTALL_DIR}/plugin)
+  add_custom_target(install_default_encr ALL DEPENDS ${default_encr_link})
+  install(FILES ${default_encr_link} DESTINATION ${GTM_INSTALL_DIR}/plugin)
+endif()
 
 # Library=OPENSSL Algorithm=AES256CFB
-add_library(libgtmcrypt_openssl_AES256CFB MODULE ${libgtmcrypt_SOURCES})
-set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES
+if(GTM_ENABLE_ENCRYPTION)
+  add_library(libgtmcrypt_openssl_AES256CFB MODULE ${libgtmcrypt_SOURCES})
+  set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES
   OUTPUT_NAME gtmcrypt_openssl_AES256CFB
   COMPILE_DEFINITIONS "USE_OPENSSL -DUSE_AES256CFB"
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
-target_link_libraries(libgtmcrypt_openssl_AES256CFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
-add_dependencies(libgtmcrypt_openssl_AES256CFB gen_gtm_threadgbl_deftypes)
-install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
+  target_link_libraries(libgtmcrypt_openssl_AES256CFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
+  add_dependencies(libgtmcrypt_openssl_AES256CFB gen_gtm_threadgbl_deftypes)
+  install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
+endif()
 
 # Library=OPENSSL Algorithm=BLOWFISHCFB
-add_library(libgtmcrypt_openssl_BLOWFISHCFB MODULE ${libgtmcrypt_SOURCES})
-set_target_properties(libgtmcrypt_openssl_BLOWFISHCFB PROPERTIES
+if(GTM_ENABLE_ENCRYPTION)
+  add_library(libgtmcrypt_openssl_BLOWFISHCFB MODULE ${libgtmcrypt_SOURCES})
+  set_target_properties(libgtmcrypt_openssl_BLOWFISHCFB PROPERTIES
   OUTPUT_NAME gtmcrypt_openssl_BLOWFISHCFB
   COMPILE_DEFINITIONS "USE_OPENSSL -DUSE_BLOWFISHCFB"
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
-target_link_libraries(libgtmcrypt_openssl_BLOWFISHCFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
-add_dependencies(libgtmcrypt_openssl_BLOWFISHCFB gen_gtm_threadgbl_deftypes)
-install(TARGETS libgtmcrypt_openssl_BLOWFISHCFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
+  target_link_libraries(libgtmcrypt_openssl_BLOWFISHCFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
+  add_dependencies(libgtmcrypt_openssl_BLOWFISHCFB gen_gtm_threadgbl_deftypes)
+  install(TARGETS libgtmcrypt_openssl_BLOWFISHCFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
-add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
-set_target_properties(libgtmtls PROPERTIES
+  add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
+  set_target_properties(libgtmtls PROPERTIES
   OUTPUT_NAME gtmtls
   COMPILE_DEFINITIONS "USE_OPENSSL"
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
-target_link_libraries(libgtmtls ${TLS_LIBRARIES})
-add_dependencies(libgtmtls gen_gtm_threadgbl_deftypes)
-install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
+  target_link_libraries(libgtmtls ${TLS_LIBRARIES})
+  add_dependencies(libgtmtls gen_gtm_threadgbl_deftypes)
+  install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
-add_executable(maskpass ${maskpass_SOURCES})
-target_link_libraries(maskpass ${GPG_LIBRARIES} ${TLS_LIBRARIES})
-set_target_properties(maskpass PROPERTIES
+  add_executable(maskpass ${maskpass_SOURCES})
+  target_link_libraries(maskpass ${GPG_LIBRARIES} ${TLS_LIBRARIES})
+  set_target_properties(maskpass PROPERTIES
   COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_SYSLIB_FUNCS"
   RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
   )
-install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
+  install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
+endif()
 
 # Always copy files into the plugin directory
 foreach(f
