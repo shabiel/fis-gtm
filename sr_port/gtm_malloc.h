@@ -12,6 +12,11 @@
 #ifndef GTM_MALLOC_H__included
 #define GTM_MALLOC_H__included
 
+/* XXX HACK from Linux for FreeBSD */
+#ifdef __freebsd__
+#define M_MMAP_MAX          -4
+#endif
+
 #define GTM_MEMORY_RESERVE_DEFAULT 64	/* 64K reserve "backpocket-cache" released on out-of-memory error */
 
 typedef GTM64_ONLY(gtm_uint8) NON_GTM64_ONLY(unsigned int) gtm_msize_t;
