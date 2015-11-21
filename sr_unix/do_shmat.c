@@ -21,7 +21,7 @@
 #include <sys/mman.h>
 #include <errno.h>
 
-#ifndef __MVS__
+#if !defined(__MVS__) && !defined(__freebsd__)
 #include <sys/sysmacros.h>
 #endif
 #include "gtm_stdio.h"
