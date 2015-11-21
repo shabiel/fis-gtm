@@ -33,7 +33,11 @@ chnd_jmp	=	24
 	addq	$chnd_jmp, REG64_ACCUM			# setjmp(ctxt->jmp)
 	movq	$0, REG64_ARG1
 	movq	REG64_ACCUM, REG64_ARG0
-	call 	__sigsetjmp@PLT
+	.ifdef __freebsd__  # needs to be defined using -Wa,--defsym,__freebsd__
+	call 	sigsetjmp
+	.else  # For Linux etc.
+	call 	__sigsetjmp@PLT			# setjmp() is really __sigsetjmp(env,0)
+	.endif
 	incl  	REG32_RET0
 	jne  	\label
 	REVERT
