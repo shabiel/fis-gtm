@@ -110,7 +110,11 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	}
 	else if (0 < pid)
 		exit(0);
+  #ifdef __freebsd__
+  (void) setpgrp (0, 0);
+  #else
 	(void) setpgrp();
+  #endif
 #	endif
 	/* Initialize logging */
 	omi_pid = getpid();
