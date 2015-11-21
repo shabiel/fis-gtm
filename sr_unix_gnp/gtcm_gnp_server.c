@@ -450,7 +450,11 @@ int main(int argc, char **argv, char **envp)
                 else if (0 < pid)
                         exit(0);
 		getjobnum();
+                #ifdef __freebsd__
+                (void) setpgrp (0, 0);
+                #else
                 (void) setpgrp();
+                #endif
         }
 	/* Write argv and the process id for ease of admin */
 	GET_CUR_TIME;
