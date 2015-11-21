@@ -23,9 +23,17 @@
 #define GTM_ID		43
 #define REPLPOOL_ID	44
 #define GTMSECSHR_ID	46
+
+#ifdef __freebsd__
+#include <sys/sem.h>
+#define RALL    SEM_R|(SEM_R>>3)|(SEM_R>>6)
+#define RWALL   SEM_R|SEM_A|(SEM_R>>3)|(SEM_A>>3)|(SEM_R>>6)|(SEM_A>>6)
+#define RWDALL  SEM_R|SEM_A|(SEM_R>>3)|(SEM_A>>3)|(SEM_R>>6)|(SEM_A>>6)
+#else
 #define RALL 		0444
 #define RWALL 		0666
 #define RWDALL 		0777
+#endif
 
 /* parameters for io_rundown() */
 #define NORMAL_RUNDOWN		0
