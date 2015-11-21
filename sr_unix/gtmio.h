@@ -51,7 +51,7 @@
 # include "wbox_test_init.h"
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) && !defined (__freebsd__)
 #include <sys/vfs.h>
 #endif
 
@@ -162,6 +162,9 @@ error_def(ERR_PREMATEOF);
 #elif defined(__MVS__)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_SYNC, FDESC);
 #define DIRECTIO_FLAG	0
+#elif defined(__freebsd__)
+#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_SYNC, FDESC);
+#define DIRECTIO_FLAG	0
 #elif defined(__linux__)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
 #define DIRECTIO_FLAG	O_DIRECT
@@ -172,7 +175,7 @@ error_def(ERR_PREMATEOF);
 #error UNSUPPORTED PLATFORM
 #endif
 
-#if defined( __linux__)
+#if defined( __linux__) && !defined(__freebsd__)
 /* A special handling was needed for linux due to its inability to lock
  * over NFS.  The only difference in code is an added check for NFS file
  * thru fstatfs
