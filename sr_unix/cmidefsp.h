@@ -92,6 +92,10 @@ typedef struct clb_stat_struct
 #include <sys/time.h>
 #endif
 
+#ifdef __freebsd__
+#include <sys/select.h>
+#endif
+
 struct CLB
 {
 	que_ent cqe;				/* forward/backward links */
