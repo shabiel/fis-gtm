@@ -18,8 +18,8 @@ GDEINIT
 	s endian("VAX","VMS")=FALSE,glo("VMS")=1024
 	s endian("AXP","VMS")=FALSE,endian("AXP","OSF1")=FALSE,glo("VMS")=1024,glo("OSF1")=1024
 	s endian("x86","SCO")=FALSE,endian("x86","UWIN")=FALSE,endian("x86","Linux")=FALSE,endian("x86","CYGWIN")=FALSE
-	s endian("x86_64","Linux")=FALSE
-	s glo("SCO")=384,glo("UWIN")=1024,glo("Linux")=1024,glo("CYGWIN")=1024
+	s endian("x86_64","Linux")=FALSE,endian("x86_64","FreeBSD")=FALSE
+	s glo("SCO")=384,glo("UWIN")=1024,glo("Linux")=1024,glo("FreeBSD")=1024,glo("CYGWIN")=1024
 	s endian("SEQUOIA_SERIES_400","VAX")=TRUE,glo("VAX")=1024
 	s endian("HP-PA","HP-UX")=TRUE,glo("HP-UX")=1024
 	s endian("IA64","HP-UX")=TRUE,glo("HP-UX")=1024
