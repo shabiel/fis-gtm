@@ -92,7 +92,7 @@ typedef struct clb_stat_struct
 #include <sys/time.h>
 #endif
 
-#ifdef __freebsd__
+#ifdef __FreeBSD__
 #include <sys/select.h>
 #endif
 

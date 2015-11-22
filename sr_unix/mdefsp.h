@@ -111,7 +111,7 @@ typedef unsigned short	in_port_t;
 #define POSIX_MSEM
 #endif
 
-#ifdef __freebsd__
+#ifdef __FreeBSD__
 #define KEY_T_LONG
 #endif
 

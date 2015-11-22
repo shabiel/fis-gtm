@@ -26,7 +26,7 @@
 	.text
 	.extern	mdb_condition_handler
 	.extern	op_unwind
-	.ifdef __freebsd__  # needs to be defined using -Wa,--defsym,__freebsd__
+	.ifdef __FreeBSD__  # needs to be defined using -Wa,--defsym,__FreeBSD__
 		.extern sigsetjmp
 	.else  # For Linux etc.
 		.extern __sigsetjmp			# setjmp() is really __sigsetjmp(env,0)

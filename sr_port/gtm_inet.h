@@ -15,7 +15,7 @@
 #ifdef VMS
 #include <inet/in.h>
 #endif
-#if defined(_AIX) || defined (__MVS__) || defined(__freebsd__)
+#if defined(_AIX) || defined (__MVS__) || defined(__FreeBSD__)
 #include <netinet/in.h>
 #endif
 

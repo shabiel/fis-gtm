@@ -201,7 +201,7 @@ void finish_object_file(void)
 #	ifdef __hpux
         ehdr->e_ident[EI_DATA] = ELFDATA2MSB;
         ehdr->e_ident[EI_OSABI] = ELFOSABI_HPUX;
-#	elif __freebsd__
+#	elif __FreeBSD__
         ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
         ehdr->e_ident[EI_OSABI] = ELFOSABI_FREEBSD;
 #	else

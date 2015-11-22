@@ -25,7 +25,7 @@
 GBLREF	boolean_t		gtm_jvm_process;
 #endif
 
-#ifdef __freebsd__
+#ifdef __FreeBSD__
 #define SIGCLD SIGCHLD
 #endif
 

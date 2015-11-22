@@ -450,7 +450,7 @@ int main(int argc, char **argv, char **envp)
                 else if (0 < pid)
                         exit(0);
 		getjobnum();
-                #ifdef __freebsd__
+                #ifdef __FreeBSD__
                 (void) setpgrp (0, 0);
                 #else
                 (void) setpgrp();

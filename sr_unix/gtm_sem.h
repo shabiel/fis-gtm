@@ -14,7 +14,7 @@
 
 #define FTOK_SEM_PER_ID 3
 
-#ifndef __freebsd__
+#ifndef __FreeBSD__
 union   semun {
 	int     val;
 	struct  semid_ds *buf;

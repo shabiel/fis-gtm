@@ -31,7 +31,7 @@ else()
 endif()
 
 # Assembler
-set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I -Wa,--defsym,__freebsd__") # gcc -I does not make it to "as"
+set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I -Wa,--defsym,__FreeBSD__") # gcc -I does not make it to "as"
 
 # Compiler
 set(CMAKE_C_FLAGS

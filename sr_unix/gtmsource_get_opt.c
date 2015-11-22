@@ -18,7 +18,7 @@
 #include "gtm_inet.h"
 #include "gtm_string.h"
 #include "gtm_ctype.h"
-#if !defined(__MVS__) && !defined(VMS) && !defined(__CYGWIN__) && !defined(__freebsd__) && (!defined(__GNUC__) && defined(__hpux))
+#if !defined(__MVS__) && !defined(VMS) && !defined(__CYGWIN__) && !defined(__FreeBSD__) && (!defined(__GNUC__) && defined(__hpux))
 #include <sys/socketvar.h>
 #endif
 #ifdef VMS

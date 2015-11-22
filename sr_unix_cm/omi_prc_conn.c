@@ -24,7 +24,7 @@ static char rcsid[] = "$Header:$";
 
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#if !defined(__MVS__) && !defined(__freebsd__)
+#if !defined(__MVS__) && !defined(__FreeBSD__)
 #include <crypt.h> /* for crypt(), actually it is in unistd.h */
 #endif
 #include "gtm_unistd.h" /* for crypt() */

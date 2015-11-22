@@ -153,7 +153,7 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 				gtmsi->bad_vadr = info->si_addr;
 				gtmsi->infotype |= GTMSIGINFO_BADR;
 				break;
-#  elif defined(__freebsd__)
+#  elif defined(__FreeBSD__)
 				gtmsi->subcode = info->si_code;
 				gtmsi->bad_vadr = info->si_addr;
 				gtmsi->infotype |= GTMSIGINFO_BADR;

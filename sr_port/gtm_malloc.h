@@ -13,7 +13,7 @@
 #define GTM_MALLOC_H__included
 
 /* XXX HACK from Linux for FreeBSD */
-#ifdef __freebsd__
+#ifdef __FreeBSD__
 #define M_MMAP_MAX          -4
 #endif
 

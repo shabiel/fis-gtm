@@ -26,7 +26,7 @@
 #include "gtm_string.h"
 #include "gtm_syslog.h"
 #include "main_pragma.h"
-#if !defined(__MVS__) && !defined(__freebsd__)
+#if !defined(__MVS__) && !defined(__FreeBSD__)
 #  include <malloc.h>
 #endif
 #include <signal.h>

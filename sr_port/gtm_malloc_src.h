@@ -51,7 +51,7 @@
 #include <stddef.h>
 #include <errno.h>
 /* malloc.h was replaced by stdlib.h on FreeBSD */
-#if !defined(VMS) && !defined(__MVS__) && !defined(__freebsd__)
+#if !defined(VMS) && !defined(__MVS__) && !defined(__FreeBSD__)
 #  include <malloc.h>
 #endif
 #include "gtm_stdio.h"
@@ -522,7 +522,7 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	 * are setup nor (potentially) most of the GTM runtime.
 	 */
 	assert(MINTWO == TwoTable[0]);
-#	if defined(__linux__) && !defined(__i386) && !defined(__freebsd__)
+#	if defined(__linux__) && !defined(__i386) && !defined(__FreeBSD__)
         /* This will make sure that all the memory allocated using 'malloc' will be in heap and no 'mmap' is used.
          * This is needed to make sure that the offset calculation that we do at places(que_ent, chache_que, etc..)
          * using 2 'malloc'ed memory can be hold in an integer. Though this will work without any problem as the
