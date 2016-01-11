@@ -223,7 +223,7 @@ error_def(ERR_PREMATEOF);
 }
 
 #if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__) || defined(__hpux) || \
-	defined(__CYGWIN__) || defined(__MVS__)
+	defined(__CYGWIN__) || defined(__MVS__) || defined(__FreeBSD__)
 /* These platforms are known to support pread/pwrite.
  * !!!!!!!!!!!!!! Note !!!!!!!!!!!!!!
  * pread and pwrite do NOT (on most platforms) set the file pointer like lseek/read/write would,
