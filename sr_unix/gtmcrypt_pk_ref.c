@@ -23,7 +23,11 @@
 #include <sys/mman.h>
 #include <sys/stat.h>			/* BYPASSOK -- see above */
 #include <sys/types.h>
-#include <gpgme.h>			/* gpgme functions */
+#ifdef __FreeBSD__                      /* gpgme functions */
+#include <gpgme/gpgme.h>
+#else
+#include <gpgme.h>			
+#endif
 #include <gpg-error.h>			/* gcry*_err_t */
 #include <libconfig.h>
 

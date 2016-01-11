@@ -22,7 +22,12 @@
 #include <assert.h>
 #include <errno.h>
 
-#include <gpgme.h>			/* gpgme functions */
+#ifdef __FreeBSD__                      /* gpgme functions */
+#include <gpgme/gpgme.h>
+#else
+#include <gpgme.h>			
+#endif
+
 #include <gpg-error.h>			/* gcry*_err_t */
 
 #include <openssl/err.h>
