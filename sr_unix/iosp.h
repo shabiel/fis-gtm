@@ -25,10 +25,13 @@
 #define GTMSECSHR_ID	46
 
 #ifdef __FreeBSD__
-#include <sys/sem.h>
-#define RALL    SEM_R|(SEM_R>>3)|(SEM_R>>6)
-#define RWALL   SEM_R|SEM_A|(SEM_R>>3)|(SEM_A>>3)|(SEM_R>>6)|(SEM_A>>6)
-#define RWDALL  SEM_R|SEM_A|(SEM_R>>3)|(SEM_A>>3)|(SEM_R>>6)|(SEM_A>>6)
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#define RALL    S_IRUSR|S_IRGRP|S_IROTH
+#define RWALL   S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH
+#define RWDALL  S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH
 #else
 #define RALL 		0444
 #define RWALL 		0666
