@@ -11,7 +11,7 @@
 
 /*	gtm_select.h - include Unix system header files needed by select().  */
 
-#if	defined(_AIX) || defined(__CYGWIN__) || defined(_UWIN)
+#if	defined(_AIX) || defined(__CYGWIN__) || defined(_UWIN) || defined(__FreeBSD__)
 #include <sys/select.h>
 
 #elif	defined(__hpux)
