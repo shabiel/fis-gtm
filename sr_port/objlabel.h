@@ -48,6 +48,8 @@
 #	define	OBJ_PLATFORM_LABEL	0		/* i386 Linux */
 #elif defined(__linux__) && defined(__x86_64)
 #       define  OBJ_PLATFORM_LABEL      0               /* x86_64 Linux */
+#elif defined(__FreeBSD__) && defined(__x86_64)
+#       define  OBJ_PLATFORM_LABEL      0               /* x86_64 FreeBSD */
 #elif defined(__MVS__)
 #	define	OBJ_PLATFORM_LABEL	0		/* OS390 aka z/OS */
 #elif defined(__hpux) && defined(__ia64)
