@@ -15,9 +15,10 @@ if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
   set(FIND_LIBRARY_USE_LIB64_PATHS FALSE)
   # Set arch to i586 in order to compile for Galileo
   set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -march=i586")
-  set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=i586")
+  set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=i586 -Wa,--defsym,__FreeBSD__=1")
 else()
   set(arch "x86_64")
+  set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,--defsym,__FreeBSD__=1")
   set(bits 64)
 endif()
 
@@ -31,7 +32,7 @@ else()
 endif()
 
 # Assembler
-set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I -Wa,--defsym,__FreeBSD__") # gcc -I does not make it to "as"
+set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
 
 # Compiler
 set(CMAKE_C_FLAGS
@@ -42,7 +43,8 @@ set(CMAKE_C_FLAGS_RELEASE
 
 add_definitions(
   #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR
-  -D_GNU_SOURCE
+  -D_BSD_SOURCE
+  -D__BSD_VISIBLE
   -D_FILE_OFFSET_BITS=64
   -D_XOPEN_SOURCE=600
   -D_LARGEFILE64_SOURCE
