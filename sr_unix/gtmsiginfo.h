@@ -18,7 +18,7 @@
 #  include <sys/siginfo.h>
 #  include <ucontext.h>
 #endif
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 #  include <ucontext.h>
 #endif
 
