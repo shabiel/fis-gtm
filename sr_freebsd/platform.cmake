@@ -58,7 +58,7 @@ set(libgtmshr_link "-Wl,-u,gtm_ci -Wl,-u,gtm_filename_to_id -Wl,--version-script
 set(libgtmshr_dep  "${GTM_BINARY_DIR}/gtmexe_symbols.export")
 
 if(${bits} EQUAL 32)
-  set(libmumpslibs "-lncurses -lm -lc -lpthread -lrt -lexecinfo")
+  set(libmumpslibs "-lncurses -lm -lc -lpthread -lrt -lexecinfo -lcrypt")
 else()
-  set(libmumpslibs "-lelf -lncurses -lm -lc -lpthread -lrt -lexecinfo")
+  set(libmumpslibs "-lelf -lncurses -lm -lc -lpthread -lrt -lexecinfo -lcrypt")
 endif()
