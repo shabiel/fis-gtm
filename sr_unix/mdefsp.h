@@ -89,7 +89,7 @@ typedef unsigned short	in_port_t; /* GCC needs this on PARISC */
 typedef uint4 mach_inst;	/* machine instruction */
 #endif /* __hpux */
 
-#if defined(__linux__) || defined(__CYGWIN__)
+#if defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__)
 #define OFF_T_LONG
 #ifdef NeedInAddrPort
 typedef unsigned short	in_port_t;
@@ -105,14 +105,10 @@ typedef unsigned short	in_port_t;
 #endif /* __s390__ */
 #endif /* __linux__ */
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 #define SYS_ERRLIST_INCLUDE	"gtm_stdio.h"
 #define MUTEX_MSEM_WAKE
 #define POSIX_MSEM
-#endif
-
-#ifdef __FreeBSD__
-#define KEY_T_LONG
 #endif
 
 #ifdef __CYGWIN__
