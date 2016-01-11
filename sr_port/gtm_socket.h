@@ -20,6 +20,12 @@
 #include <sys/socket.h>
 #endif
 
+/* VEN/SMH - Necessary for sockaddr_in for FreeBSD
+   See: https://code.google.com/p/pure-lang/issues/detail?id=52 */
+#ifdef __FreeBSD__
+#include <netinet/in.h>
+#endif
+
 #define BIND		bind
 #define CONNECT		connect
 #define ACCEPT		accept
