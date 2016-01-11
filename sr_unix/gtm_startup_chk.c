@@ -56,6 +56,13 @@
 #include <sys/pstat.h>
 #endif
 
+/* FreeBSD: Ditto. Same problem. 
+ * http://stackoverflow.com/questions/799679/programatically-retrieving-the-absolute-path-of-an-os-x-command-line-app*/
+#if defined(__FreeBSD__)
+     #include <sys/types.h>
+     #include <sys/sysctl.h>
+#endif
+
 GBLREF	char		gtm_dist[GTM_PATH_MAX];
 GBLREF	boolean_t	gtm_dist_ok_to_use;
 LITREF	gtmImageName	gtmImageNames[];
@@ -159,6 +166,14 @@ int gtm_image_path(char *realpath)
 		return status;
 #elif defined(__linux__) || defined(__sparc) ||  defined(_AIX)
 	SNPRINTF(realpath, GTM_PATH_MAX, PROCSELF, process_id);
+#elif defined(__FreeBSD__)
+	int mib[4];
+	mib[0] = CTL_KERN;
+	mib[1] = KERN_PROC;
+	mib[2] = KERN_PROC_PATHNAME;
+	mib[3] = -1;
+	size_t cb = (size_t)GTM_PATH_MAX;
+	sysctl(mib, 4, realpath, &cb, NULL, 0);
 #else
 #	error "Unsupported platform : no way to determine the true exe path"
 #endif
