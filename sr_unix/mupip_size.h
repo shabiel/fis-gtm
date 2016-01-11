@@ -15,7 +15,7 @@
 #include "cdb_sc.h"
 
 void mupip_size(void);
-int4 mu_size_arsample(glist *gl_ptr, uint M, int seed);
+int4 mu_size_arsample(glist *gl_ptr, uint4 M, int seed);
 int4 mu_size_impsample(glist *gl_ptr, int4 M, int4 seed);
 int4 mu_size_scan(glist *gl_ptr, int4 level);
 enum cdb_sc mu_size_rand_traverse(double *r, double *a);
