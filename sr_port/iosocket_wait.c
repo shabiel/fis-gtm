@@ -518,7 +518,7 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 			case ETIMEDOUT:
 			case ECONNRESET:
 			case ENOTCONN:
-#			ifndef VMS
+#			if !defined(VMS) && !defined(__FreeBSD__)
 			case ENOSR:
 #			endif
 				return errno;	/* pending connection gone so retry */
