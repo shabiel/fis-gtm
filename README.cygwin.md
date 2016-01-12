@@ -10,13 +10,34 @@ Open cmd as admin, and install chocolatey, and then install Cygwin x86.
 choco install cygwin -x86
 ```
 
-You now need to open cygwin, in its default location under `c:\tools\cygwin\` and execute the bat file. Once in, install apt-cyg and use that to install most software.
+You now need to open cygwin, in its default location under the START>All Programs>Cygwin>Cygwin Terminal. Once in, install apt-cyg and use that to install most software.
 
 ```
 lynx -source rawgit.com/transcode-open/apt-cyg/master/apt-cyg > apt-cyg
 install apt-cyg /bin
 hash -r
 ```
+if you a message such as
+...
+Looking up rawgit.com
+Making HTTP connection to rawgit.com
+Sending HTTP request.
+HTTP request sent; waiting for response.
+HTTP/1.1 301 Moved Permanently
+Data transfer complete
+HTTP/1.1 301 Moved Permanently
+Using https://raw.githubusercontent.com/transcode-open/apt-cyg/master/apt-cyg
+Looking up raw.githubusercontent.com
+Making HTTPS connection to raw.githubusercontent.com
+SSL callback:unable to get local issuer certificate, preverify_ok=0, ssl_okay=0
+Retrying connection without TLS.
+Looking up raw.githubusercontent.com
+Making HTTPS connection to raw.githubusercontent.com
+Alert!: Unable to make secure connection to remote host.
+
+lynx: Can't access startfile http://rawgit.com/transcode-open/apt-cyg/master/apt-cyg
+...
+Then you should google how to create a text file, fill contents from that location and make the file executable
 
 Then install lots of stuff. But NOT!! cmake. The version in the repos is corrupt. We will compile cmake from source.
 ```
