@@ -67,3 +67,11 @@ cmake .
 make
 make install
 ```
+
+To run GT.M you need to install and start the cygserver
+
+In an administrator cygwin-terminal (right click cygwin-terminal and click run as administrator)
+```
+/usr/bin/cygserver-config
+net start cygserver
+```
