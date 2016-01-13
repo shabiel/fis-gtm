@@ -18,7 +18,7 @@ install apt-cyg /bin
 hash -r
 ```
 if you a message such as
-...
+```
 Looking up rawgit.com
 Making HTTP connection to rawgit.com
 Sending HTTP request.
@@ -36,21 +36,21 @@ Making HTTPS connection to raw.githubusercontent.com
 Alert!: Unable to make secure connection to remote host.
 
 lynx: Can't access startfile http://rawgit.com/transcode-open/apt-cyg/master/apt-cyg
-...
-Then you should google how to create a text file, fill contents from that location and make the file executable
+```
+Then there was a problem installing cygwin. You should download cygwin without using chocolatey by going to cygwin.com
 
 Then install lots of stuff. But NOT!! cmake. The version in the repos is corrupt. We will compile cmake from source.
 ```
-apt-cyg install wget git libelf0-devel zlib-devel libicu-devel libgpgme-devel libgpg-error-devel libgrcypt-devel openssl-devel tcsh libncurses-devel gcc4-g++ gdb automake make flex bison libnettle-devel libnettle
+apt-cyg install wget git libelf0-devel zlib-devel libicu-devel libgpgme-devel libgpg-error-devel openssl-devel tcsh libncurses-devel gcc4-g++ gdb automake make flex bison libnettle-devel libnettle
 hash -r
 ```
 
 Install both libconfig and cmake from source:
 ```
 git clone https://github.com/hyperrealm/libconfig && cd libconfig
-./configure
-make
-make install
+git checkout v1.5
+autoheader && aclocal && automake --add-missing --copy && autoconf && ./configure
+make && make install
 cd
 wget --no-check-certificate https://cmake.org/files/v3.4/cmake-3.4.0.tar.gz
 tar xzvf cmake-3.4.0.tar.gz
@@ -60,9 +60,10 @@ cd cmake-3.4.0
 
 Now, compile GT.M:
 ```
+cd
 git clone https://github.com/shabiel/fis-gtm && cd fis-gtm
 git checkout cygwin
-cmake . (add debug options here or use ccmake)
+cmake .
 make
 make install
 ```
