@@ -41,7 +41,7 @@ Then you should google how to create a text file, fill contents from that locati
 
 Then install lots of stuff. But NOT!! cmake. The version in the repos is corrupt. We will compile cmake from source.
 ```
-apt-cyg install wget git libelf0-devel zlib-devel libicu-devel libgpgme-devel libgpg-error-devel libgrcypt-devel openssl-devel tcsh libncurses-devel gcc4-g++ gdb automake make flex bison
+apt-cyg install wget git libelf0-devel zlib-devel libicu-devel libgpgme-devel libgpg-error-devel libgrcypt-devel openssl-devel tcsh libncurses-devel gcc4-g++ gdb automake make flex bison libnettle-devel libnettle
 hash -r
 ```
 
