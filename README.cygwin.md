@@ -7,7 +7,7 @@ Open cmd as admin, and install chocolatey, and then install Cygwin x86.
 
 ```
 @powershell -NoProfile -ExecutionPolicy Bypass -Command "iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1'))" && SET PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin
-choco install cygwin -x86
+choco install cygwin -x86 -version 2.3.0
 ```
 
 You now need to open cygwin, in its default location under the START>All Programs>Cygwin>Cygwin Terminal. Once in, install apt-cyg and use that to install most software.
