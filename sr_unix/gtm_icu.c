@@ -363,7 +363,11 @@ void gtm_icu_init(void)
 		assert((0 != findx) || (-1 == symbols_renamed));
 		assert((0 == findx) || (FALSE == symbols_renamed) || (TRUE == symbols_renamed));
 		if ((0 == findx) || !symbols_renamed)
+#ifdef __CYGWIN__ /* Don't ask why... I have no idea how all the funcs are just in the global space in Cygwin */
+			fptr = (icu_func_t)dlsym(NULL, icu_final_fname);
+#else
 			fptr = (icu_func_t)dlsym(handle, icu_final_fname);
+#endif
 		if (NULL == fptr)
 		{	/* If gtm_icu_version is defined to a proper value, then try function name with <major_ver>_<minor_ver> */
 			if (gtm_icu_ver_defined && ((0 == findx) || symbols_renamed))
