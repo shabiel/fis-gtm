@@ -391,7 +391,11 @@ void gtm_icu_init(void)
 					save_fname_len += minor_ver_len;
 					icu_final_fname[save_fname_len] = '\0';
 					assert(SIZEOF(icu_final_fname) > save_fname_len);
+#ifdef __CYGWIN__ 
+					fptr = (icu_func_t)dlsym(NULL, icu_final_fname);
+#else
 					fptr = (icu_func_t)dlsym(handle, icu_final_fname);
+#endif
 				}
 			}
 			if (NULL == fptr)
