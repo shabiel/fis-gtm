@@ -381,7 +381,11 @@ void gtm_icu_init(void)
 				icu_final_fname_len += minor_ver_len;
 				icu_final_fname[icu_final_fname_len] = '\0';
 				assert(SIZEOF(icu_final_fname) > icu_final_fname_len);
+#ifdef __CYGWIN__ /* ditto */
+				fptr = (icu_func_t)dlsym(NULL, icu_final_fname);
+#else
 				fptr = (icu_func_t)dlsym(handle, icu_final_fname);
+#endif
 				if (NULL == fptr)
 				{	/* from ICU 4.4, symbols renaming is done differently. u_getVersion_4_4 now becomes
 					 * u_getVersion_44. Try the new renaming instead
@@ -391,7 +395,11 @@ void gtm_icu_init(void)
 					save_fname_len += minor_ver_len;
 					icu_final_fname[save_fname_len] = '\0';
 					assert(SIZEOF(icu_final_fname) > save_fname_len);
+#ifdef __CYGWIN__ /* ditto */
+					fptr = (icu_func_t)dlsym(NULL, icu_final_fname);
+#else
 					fptr = (icu_func_t)dlsym(handle, icu_final_fname);
+#endif
 				}
 			}
 			if (NULL == fptr)
