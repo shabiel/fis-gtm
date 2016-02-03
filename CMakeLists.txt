@@ -137,7 +137,7 @@ if(gen_bootstrap)
   set(source_dir_gen ${GTM_BINARY_DIR}/gen)
   # Hard-code list since we cannot glob files that do not exist.
   set(sources_gen cmerrors_ctl.c cmierrors_ctl.c gdeerrors_ctl.c merrors_ctl.c ttt.c
-  		  gtmthreadgblasm.m gtm_threadgbl_deftypes.h gtm_threadgbl_deftypes_asm.si)
+      gtm_threadgbl_deftypes.h gtm_threadgbl_deftypes_asm.si)
 endif()
 
 # The C preprocessor include search path consists of every source
