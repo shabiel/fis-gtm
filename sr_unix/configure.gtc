@@ -58,6 +58,8 @@ fi
 # Native shared library extension.
 if [ $arch = "hp" -a `uname -m` != "ia64" ]; then
 	ext=".sl"
+elif [ $OS = "Windows_NT" ]; then
+	ext=".dll"
 else
 	ext=".so"
 fi
@@ -71,7 +73,12 @@ else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
 # Binaries
-binaries="mupip mumps libgtmshr$ext lke dse  geteuid ftok semstat2"
+if [ $OS = "Windows_NT" ]; then
+	libgtmshr="cyggtmshr"
+else
+	libgtmshr="libgtmshr"
+fi
+binaries="mupip mumps $libgtmshr$ext lke dse geteuid ftok semstat2"
 
 # Normal scripts - executed by anyone
 nscripts="gtmbase lowerc_cp"
@@ -102,9 +109,14 @@ fi
 # geteuid is no longer executable in distribution so change it
 chmod 755 ./geteuid
 
-if [ "`./geteuid`" != "root" ] ; then
-	$echo "You must run Configure as root."
-	exit
+if [ $OS = "Windows_NT" ]; then
+	if ! `id -G | grep -qE '\<(544|0)\>'`; then
+		$echo "You must run Configure as Administrator."
+		exit
+	fi
+elif [ "`./geteuid`" != "root" ]; then
+		$echo "You must run Configure as root."
+		exit
 fi
 
 $echo "                     GT.M Configuration Script"
@@ -116,6 +128,13 @@ $echo ""
 rootuser=root
 bingroup=bin
 defowner=bin
+
+# Reset defaults if we are on Cygwin/windows
+if [ $OS = "Windows_NT" ]; then
+	rootuser="Administrator"
+	bingroup="Administrators"
+	defowner=$USER
+fi
 
 # create temporary file to test for valid user and group names
 touch tmp_owngrp
@@ -267,6 +286,8 @@ if [ -d "utf8" ]; then
 		icu_ext=".a"
 	elif [ $arch = "hp" ] ; then
 		icu_ext=".sl"
+	elif [ $OS = "Windows_NT" ]; then
+		icu_ext=".dll.a"
 	fi
 	if [ "$would_like_utf8" -eq 1 ] ; then
 		for libpath in $library_path
@@ -277,14 +298,16 @@ if [ -d "utf8" ]; then
 				# Find the actual version'ed library to which libicuio.{so,sl,a} points to
 				icu_versioned_lib=`ls -l $libpath/libicuio$icu_ext | awk '{print $NF}'`
 				# Find out vital parameters
-				if [ $arch = "ibm" ]; then
+				if [ $arch = "ibm" -o $OS = "Windows_NT" ]; then
 					# From the version'ed library(eg. libicuio36.0.a) extract out
 					# 36.0.a
 					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio//g'`
 					# Extract 36 from 36.0.a
 					majmin=`$echo $full_icu_ver_string | cut -f 1 -d '.'`
 				else
+					echo "icu_versioned_lib" $icu_versioned_lib
 					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio\.//g'`
+					echo "full_icu_ver_string" $full_icu_ver_string
 					majmin=`$echo $full_icu_ver_string | cut -f 2 -d '.'`
 				fi
 			elif [ "$gtm_icu_version" != "" ] ; then
@@ -314,6 +337,9 @@ if [ -d "utf8" ]; then
 				if [ "$is64bit_gtm" -eq 1 -a "$is64bit_icu" -ne 0 ] ; then
 					found_icu=1
 				elif [ "$is64bit_gtm" -ne 1 -a "$is64bit_icu" -eq 0 ] ; then
+					found_icu=1
+				elif [ $OS = "Windows_NT" ]; then
+					# We have to trust cygwin to find the right libicuio as file doesn't return usable results
 					found_icu=1
 				else
 					found_icu=0
@@ -466,7 +492,7 @@ done
 # command is required on many modern SELinux based systems but depends on the filesystem in use (requires context
 # support). For that reason, we attempt the command and if it works, great. If it doesn't, oh well we tried.
 if [ -f /usr/bin/chcon ]; then
-	chcon -t texrel_shlib_t $gtmdist/libgtmshr$ext > /dev/null 2>&1
+	chcon -t texrel_shlib_t $gtmdist/$libgtmshr$ext > /dev/null 2>&1
 fi
 
 # Create $gtmdist/plugin/gtmcrypt directory if this platform supports encryption
@@ -633,7 +659,7 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 fi
 
 # Change mode to executable for mumps and libgtmshr to do the compiles
-chmod 755 $gtmdist/mumps $gtmdist/libgtmshr$ext
+chmod 755 $gtmdist/mumps $gtmdist/$libgtmshr$ext
 
 gtmroutines=$gtmdist
 gtmgbldir=$gtmdist/mumps.gld
@@ -772,9 +798,12 @@ chmod 700 $tgtmsecshrdir
 chgrp $bingroup $tgtmsecshrdir
 
 # Install gtmsecshr and the wrapper with special permissions
-if [ $arch = "sun" -o $arch = "linux" ]; then
+if [ $arch = "sun" -o $arch = "linux" -a $OS != "Windows_NT" ]; then
 	install -m 4555 -o root -g $bingroup gtmsecshr $gtmdist
 	install -m 4500 -o root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
+elif [ $OS = "Windows_NT" ]; then
+	install -m 4555 -o Administrator -g $bingroup gtmsecshr.exe $gtmdist
+	install -m 4500 -o Administrator -g $bingroup gtmsecshrdir/gtmsecshr.exe $tgtmsecshrdir/gtmsecshr.exe
 elif [ $arch = "ibm" ]; then
 	/usr/bin/install -f $gtmdist -M 4555 -O root -G $bingroup gtmsecshr
 	/usr/bin/install -f $tgtmsecshrdir -M 4500 -O root -G $bingroup gtmsecshrdir/gtmsecshr
@@ -795,8 +824,13 @@ if [ -d $gtmdist/utf8 ]; then
 	if [ -f $gtmdist/utf8/gtmsecshr -o -h $gtmdist/utf8/gtmsecshr ]; then
 		rm -f $gtmdist/utf8/gtmsecshr
 	fi
-	ln $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr || \
-		echo ln $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr
+	if [ $OS = "Windows_NT" ]; then
+		ln -s $gtmdist/gtmsecshr.exe $gtmdist/utf8/gtmsecshr.exe || \
+			echo ln $gtmdist/gtmsecshr.exe $gtmdist/utf8/gtmsecshr.exe
+	else
+		ln $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr || \
+			echo ln $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr
+	fi
 
 	# Delete the gtmsecshrdir symlink
 	if [ -f $gtmdist/utf8/gtmsecshrdir -o -h $gtmdist/utf8/gtmsecshrdir ]; then
@@ -804,8 +838,13 @@ if [ -d $gtmdist/utf8 ]; then
 	fi
 	mkdir -p $gtmdist/utf8/gtmsecshrdir
 	chmod 0500 $gtmdist/utf8/gtmsecshrdir
-	ln $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr || \
-		echo ln $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr
+	if [ $OS = "Windows_NT" ]; then
+		ln -s $gtmdist/gtmsecshrdir/gtmsecshr.exe $gtmdist/utf8/gtmsecshrdir/gtmsecshr.exe || \
+			echo ln -s $gtmdist/gtmsecshrdir/gtmsecshr.exe $gtmdist/utf8/gtmsecshrdir/gtmsecshr.exe
+	else
+		ln $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr || \
+			echo ln $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr
+	fi
 
 fi
 
