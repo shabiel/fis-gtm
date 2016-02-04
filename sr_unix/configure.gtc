@@ -825,7 +825,7 @@ if [ -d $gtmdist/utf8 ]; then
 		rm -f $gtmdist/utf8/gtmsecshr
 	fi
 	if [ $OS = "Windows_NT" ]; then
-		ln -s $gtmdist/gtmsecshr.exe $gtmdist/utf8/gtmsecshr.exe || \
+		ln $gtmdist/gtmsecshr.exe $gtmdist/utf8/gtmsecshr.exe || \
 			echo ln $gtmdist/gtmsecshr.exe $gtmdist/utf8/gtmsecshr.exe
 	else
 		ln $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr || \
