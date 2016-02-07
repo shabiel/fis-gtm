@@ -3,6 +3,10 @@ These are quick instructions to first install Cygwin x86 and then compile GT.M o
 
 Tested on Windows 10.
 
+# Important notes to the below
+Since this has been written, apt-cyg was taken down. Instead of using apt-cyg, you can use follow these instructions: https://github.com/shabiel/fis-gtm/issues/8 or use the Setup-x86.exe program to install the software one by one.
+
+# Install Instructions
 Open cmd as admin, and install chocolatey, and then install Cygwin x86. 
 
 ```
