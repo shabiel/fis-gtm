@@ -83,6 +83,8 @@ else()
   message(FATAL_ERROR "--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
+set(GTM_ENABLE_ENCRYPTION 1 CACHE BOOL "Enable GT.M Encryption Libraries")
+
 # Choose where to get bootstrap sources.
 set(GTM_DIST "" CACHE PATH "Existing GT.M Distribution")
 if(GTM_DIST)
@@ -486,7 +488,15 @@ add_dependencies(semstat2		gen_gtm_threadgbl_deftypes)
 add_executable(ftok 			${ftok_SOURCES})
 target_link_libraries(ftok 		libmumps libstub)
 
-add_library(libgtmshr MODULE ${libgtmshr_SOURCES})
+# VEN/SMH - Only difference b/n SHARED and MODULE is production of Import Library.
+# We need the import Library on Cygwin to link the Encryption Libraries
+if(CYGWIN)
+    set(libgtmshr_libtype SHARED)
+else()
+    set(libgtmshr_libtype MODULE)
+endif()
+
+add_library(libgtmshr ${libgtmshr_libtype} ${libgtmshr_SOURCES})
 set_property(TARGET libgtmshr PROPERTY OUTPUT_NAME gtmshr)
 target_link_libraries(libgtmshr libmumps libgnpclient libcmisockettcp)
 set_target_properties(libgtmshr PROPERTIES
@@ -530,6 +540,10 @@ if(GTM_ENABLE_ENCRYPTION)
   )
   add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so gen_gtm_threadgbl_deftypes)
   target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES})
+  if(CYGWIN) # VEN/SMH: Cygwin needs import libraries to resolve all symbols. Windows thing.
+      add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so libgtmshr)
+      target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so libgtmshr)
+  endif()
   install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${GTM_INSTALL_DIR}/plugin)
 endif()
 
@@ -557,6 +571,10 @@ if(GTM_ENABLE_ENCRYPTION)
   )
   target_link_libraries(libgtmcrypt_openssl_AES256CFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
   add_dependencies(libgtmcrypt_openssl_AES256CFB gen_gtm_threadgbl_deftypes)
+  if(CYGWIN) # VEN/SMH: Cygwin needs import libraries to resolve all symbols. Windows thing.
+      add_dependencies(libgtmcrypt_openssl_AES256CFB libgtmshr)
+      target_link_libraries(libgtmcrypt_openssl_AES256CFB libgtmshr)
+  endif()
   install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
 endif()
 
@@ -570,6 +588,10 @@ if(GTM_ENABLE_ENCRYPTION)
   )
   target_link_libraries(libgtmcrypt_openssl_BLOWFISHCFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
   add_dependencies(libgtmcrypt_openssl_BLOWFISHCFB gen_gtm_threadgbl_deftypes)
+  if(CYGWIN) # VEN/SMH: Cygwin needs import libraries to resolve all symbols. Windows thing.
+      add_dependencies(libgtmcrypt_openssl_BLOWFISHCFB libgtmshr)
+      target_link_libraries(libgtmcrypt_openssl_BLOWFISHCFB libgtmshr)
+  endif()
   install(TARGETS libgtmcrypt_openssl_BLOWFISHCFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
   add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
@@ -580,6 +602,10 @@ if(GTM_ENABLE_ENCRYPTION)
   )
   target_link_libraries(libgtmtls ${TLS_LIBRARIES})
   add_dependencies(libgtmtls gen_gtm_threadgbl_deftypes)
+  if(CYGWIN) # VEN/SMH: Cygwin needs import libraries to resolve all symbols. Windows thing.
+      add_dependencies(libgtmtls libgtmshr)
+      target_link_libraries(libgtmtls libgtmshr)
+  endif()
   install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
   add_executable(maskpass ${maskpass_SOURCES})
