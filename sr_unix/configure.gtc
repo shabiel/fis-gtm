@@ -1,5 +1,5 @@
 #!/bin/sh
-#################################################################
+################################################################
 #								#
 # Copyright (c) 2009-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
@@ -463,7 +463,11 @@ for i in $rscripts
 do
 	cp -p $i $gtmdist
 	chmod 0744 $gtmdist/$i
-	chown $rootuser $gtmdist/$i
+	if [ $OS = "Windows_NT" ]; then
+		chown $owner $gtmdist/$i
+	else
+		chown $rootuser $gtmdist/$i
+	fi	
 done
 
 # Install the normal binaries
@@ -802,8 +806,8 @@ if [ $arch = "sun" -o $arch = "linux" -a $OS != "Windows_NT" ]; then
 	install -m 4555 -o root -g $bingroup gtmsecshr $gtmdist
 	install -m 4500 -o root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
 elif [ $OS = "Windows_NT" ]; then
-	install -m 4555 -o Administrator -g $bingroup gtmsecshr.exe $gtmdist
-	install -m 4500 -o Administrator -g $bingroup gtmsecshrdir/gtmsecshr.exe $tgtmsecshrdir/gtmsecshr.exe
+	install -m 6555 -o $owner -g $bingroup gtmsecshr.exe $gtmdist
+	install -m 6500 -o $owner -g $bingroup gtmsecshrdir/gtmsecshr.exe $tgtmsecshrdir/gtmsecshr.exe
 elif [ $arch = "ibm" ]; then
 	/usr/bin/install -f $gtmdist -M 4555 -O root -G $bingroup gtmsecshr
 	/usr/bin/install -f $tgtmsecshrdir -M 4500 -O root -G $bingroup gtmsecshrdir/gtmsecshr
