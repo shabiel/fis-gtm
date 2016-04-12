@@ -54,7 +54,6 @@
 	set commentchar("SolarisOnSPARC")="!"
 	set commentchar("CygwinOnX8632")="#"
 	set gtmzv=$ZVersion
-	set gtmver=$ZPiece(gtmzv," ",2)
 	set gtmos=$ZPiece(gtmzv," ",3)
 	set gtmhdwr=$ZPiece(gtmzv," ",4)
 	if (0=$get(platform(gtmos,gtmhdwr))) do
@@ -96,11 +95,11 @@
 	use outfile
 	if ("AIXOnPSeries"=platform) do
 	. write "/*",!
-	. write " * Created by gtmthreadgblasm for version ",gtmver," on ",gtmos," ",gtmhdwr," (",defsout,")",!
+	. write " * Created by gtmthreadgblasm for ",gtmos," on ",gtmhdwr," (",defsout,")",!
 	. write " */",!
 	else  do
 	. write commentchar(platform),!
-	. write commentchar(platform)," Created by gtmthreadgblasm for version ",gtmver," on ",gtmos," ",gtmhdwr," (",defsout,")",!
+	. write commentchar(platform)," Created by gtmthreadgblasm for ",gtmos," on ",gtmhdwr," (",defsout,")",!
 	. write commentchar(platform),!
 	for  use infile read line quit:$zeof  do
 	. quit:("#"'=$zextract(line,1))

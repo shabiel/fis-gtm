@@ -15,7 +15,7 @@
 
 #ifdef MUTEX_MSEM_WAKE
 #ifdef POSIX_MSEM
-#include <semaphore.h>
+#include "gtm_semaphore.h"
 #else
 #include <sys/mman.h>
 #endif

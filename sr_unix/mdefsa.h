@@ -64,6 +64,8 @@
 	 * So we need to link with a member of the library instead of the library itself.
 	 */
 #		define	ICU_LIBNAME_EXT	"a"
+	/* AIX system default ICU library uses a different convention for the library name */
+#		define	ICU_LIBNAME_DEF	ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT "(shr_64.o)"
 #	else
 #		define	ICU_LIBNAME_EXT	"so"
 #	endif

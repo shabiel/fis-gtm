@@ -16,14 +16,8 @@
 
 #ifdef __sparc
 #  include <sys/siginfo.h>
-#  include <ucontext.h>
 #endif
-#ifdef __linux__
 #  include <ucontext.h>
-#endif
-#ifdef __CYGWIN__
-#  include <ucontext.h>
-#endif
 
 typedef struct
 {

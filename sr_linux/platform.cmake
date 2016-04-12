@@ -9,6 +9,7 @@
 #								#
 #################################################################
 
+set(srdir "sr_linux")
 if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
   set(arch "x86")
   set(bits 32)
@@ -42,21 +43,17 @@ endif()
 set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
 
 # Compiler
-# Cygwin must have -ansi undefined (it adds __STRICT_ANSI__ which undefines some important prototypes like fdopen())
-# See http://stackoverflow.com/questions/21689124/mkstemp-and-fdopen-in-cygwin-1-7-28
-# Cygwin warns if you add -fPIC that the compiled code is already position independent. So don't add -fPIC
-# (VEN/SMH): Looks like we need to add the defsym to tell the assembler to define 'cygwin'
 if(${CYGWIN})
-  set(CMAKE_C_FLAGS
-    "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
+  # (VEN/SMH): Looks like we need to add the defsym to tell the assembler to define 'cygwin'
   set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,--defsym,cygwin=1")
 else()
-set(CMAKE_C_FLAGS
-  "${CMAKE_C_FLAGS} -ansi -fsigned-char -fPIC -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
+  # Cygwin must have -ansi undefined (it adds __STRICT_ANSI__ which undefines some important prototypes like fdopen())
+  #   See http://stackoverflow.com/questions/21689124/mkstemp-and-fdopen-in-cygwin-1-7-28
+  # Cygwin warns if you add -fPIC that the compiled code is already position
+  # independent. So don't add -fPIC
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ansi -fPIC ")
 endif()
-
-set(CMAKE_C_FLAGS_RELEASE
-  "${CMAKE_C_FLAGS_RELEASE} -fno-defer-pop -fno-strict-aliasing -ffloat-store")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
 
 add_definitions(
   #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR
