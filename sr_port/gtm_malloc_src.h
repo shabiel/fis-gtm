@@ -49,7 +49,7 @@
 #include <stddef.h>
 #include <errno.h>
 /* malloc.h was replaced by stdlib.h on FreeBSD */
-#if !defined(__MVS__) || !defined(__FreeBSD__)
+#if !defined(__MVS__) && !defined(__FreeBSD__)
 #  include <malloc.h>
 #endif
 #include "gtm_stdio.h"
