@@ -16,11 +16,9 @@
 
 #ifdef __sparc
 #  include <sys/siginfo.h>
-#  include <ucontext.h>
 #endif
 #if defined(__linux__) || defined(__FreeBSD__)
 #  include <ucontext.h>
-#endif
 
 typedef struct
 {
@@ -42,8 +40,6 @@ typedef struct
 
 #if defined(__osf__)
 typedef	struct sigcontext	gtm_sigcontext_t;
-#elif defined(__CYGWIN__)
-typedef	struct ucontext		gtm_sigcontext_t;
 #elif defined(_AIX)
 typedef struct sigcontext64	gtm_sigcontext_t;
 #else
