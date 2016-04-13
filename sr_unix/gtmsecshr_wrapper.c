@@ -219,7 +219,7 @@ int main()
 	}
 	if (!ret)
 	{	/* clear all */
-#		ifdef SUNOS
+#		if defined(SUNOS) || defined(__FreeBSD__) 
 		environ = NULL;
           	status = 0;
 #		else
