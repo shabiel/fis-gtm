@@ -10,9 +10,9 @@
  ****************************************************************/
 
 #if defined(__x86_64__)
-#define GTM_RELEASE_NAME 	"GT.M V6.2-002A FreeBSD x86_64"
+#define GTM_RELEASE_NAME 	"GT.M V6.3-000 FreeBSD x86_64"
 #else
-#define GTM_RELEASE_NAME 	"GT.M V6.2-002A FreeBSD x86"
+#define GTM_RELEASE_NAME 	"GT.M V6.3-000 FreeBSD x86"
 #endif
 #define GTM_PRODUCT 		"GT.M"
-#define GTM_VERSION		"V6.2"
+#define GTM_VERSION		"V6.3"
