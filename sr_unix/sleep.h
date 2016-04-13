@@ -31,7 +31,7 @@ void m_usleep(int useconds);
 #   endif
 #endif
 
-#if defined(__MVS__) || defined(__CYGWIN__) || defined(__hpux) || defined(_AIX)
+#if defined(__MVS__) || defined(__CYGWIN__) || defined(__hpux) || defined(_AIX) || defined(__FreeBSD__)
 /* For HP-UX the clock_* seem to be missing; for AIX the accuracy of clock_* is currently poor */
 #define SET_EXPIR_TIME(NOW_TIMEVAL, EXPIR_TIMEVAL, SECS, USECS)				\
 MBSTART {										\
@@ -139,7 +139,7 @@ MBSTART {										\
 	SLEEP_USEC((1000 > (NANOSECONDS)) ? 1 : ((NANOSECONDS) / 1000), RESTART);	\
 } MBEND
 #endif
-#if !defined(__MVS__) && !defined(__CYGWIN__) && !defined(__hpux)
+#if !defined(__MVS__) && !defined(__CYGWIN__) && !defined(__hpux) && !defined(__FreeBSD__)
 /* Nonetheless, because we continue to press for the highest time discrimination available, where posible we use
  * clock_nanosleep and clock_gettime, which, while currently no faster than gettimeofday(), do eventually promise
  * sub-millisecond accuracy
