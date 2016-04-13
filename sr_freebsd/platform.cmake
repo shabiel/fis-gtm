@@ -9,6 +9,7 @@
 #								#
 #################################################################
 
+set(srdir "sr_freebsd")
 if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
   set(arch "x86")
   set(bits 32)
