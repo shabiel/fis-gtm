@@ -16,6 +16,8 @@
 .ifdef cygwin
 # This is provisionally bumped up by 8. It needs be be verified on a 64-bit cygwin computer
 chnd_size	=	288
+.elseif __FreeBSD__!=0
+chnd_size       =       128
 .else
 chnd_size	=	232
 .endif
