@@ -320,6 +320,7 @@ void finish_object_file(void)
         if (0 > elf_update(elf, ELF_C_WRITE))
         {
                 FPRINTF(stderr, "elf_update() failed!\n");
+                FPRINTF(stderr, elf_errmsg(elf_errno()));
                 assertpro(FALSE);
         }
         elf_end(elf);
