@@ -1453,6 +1453,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ENCRYPTCONFLT", "MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD", 6 },
 	{ "JNLPOOLRECOVERY", "The size of the data written to the journal pool (!UL) does not match the size of the data in the journal record (!UL) for the replication instance file !AZ. The journal pool has been recovered.", 3 },
 	{ "LOCKTIMINGINTP", "A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap", 2 },
+	{ "QUERY2", "Invalid second argument to $QUERY.  Must be -1 or 1.", 0 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -2895,9 +2896,10 @@ LITDEF	int ERR_MUREENCRYPTV4NOALLOW = 150383850;
 LITDEF	int ERR_ENCRYPTCONFLT = 150383858;
 LITDEF	int ERR_JNLPOOLRECOVERY = 150383866;
 LITDEF	int ERR_LOCKTIMINGINTP = 150383872;
+LITDEF	int ERR_QUERY2 = 150383882;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1440};
+	1441};

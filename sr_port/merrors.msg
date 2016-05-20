@@ -1618,6 +1618,7 @@ MUREENCRYPTV4NOALLOW	<Database (re)encryption supported only on fully upgraded V
 ENCRYPTCONFLT	<MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD>/error/fao=6!/ansi=0
 JNLPOOLRECOVERY	<The size of the data written to the journal pool (!UL) does not match the size of the data in the journal record (!UL) for the replication instance file !AZ. The journal pool has been recovered.>/error/fao=3!/ansi=0
 LOCKTIMINGINTP	<A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap>/warning/fao=2!/ansi=0
+QUERY2		<Invalid second argument to $QUERY.  Must be -1 or 1.>/error/fao=0!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !
