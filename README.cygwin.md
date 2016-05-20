@@ -1,17 +1,14 @@
 # Instructions to compile GT.M on Cygwin
 These are quick instructions to first install Cygwin x86 and then compile GT.M on it. It will take a while as compiling on Cygwin/gcc is really slow.
 
-Tested on Windows 10.
-
-# Important notes to the below
-Since this has been written, apt-cyg was taken down. Instead of using apt-cyg, you can use follow these instructions: https://github.com/shabiel/fis-gtm/issues/8 or use the Setup-x86.exe program to install the software one by one.
+Tested most recently on Cygwin 2.5 x86 / Windows 10 Beta Build 14342.
 
 # Install Instructions
 Open cmd as admin, and install chocolatey, and then install Cygwin x86. 
 
 ```
 @powershell -NoProfile -ExecutionPolicy Bypass -Command "iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1'))" && SET PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin
-choco install cygwin -x86 -version 2.3.0
+choco install cygwin -x86
 ```
 
 You now need to open cygwin, in its default location under the START>All Programs>Cygwin>Cygwin Terminal. Once in, install apt-cyg and use that to install most software.
@@ -19,7 +16,6 @@ You now need to open cygwin, in its default location under the START>All Program
 ```
 lynx -source rawgit.com/transcode-open/apt-cyg/master/apt-cyg > apt-cyg
 install apt-cyg /bin
-hash -r
 ```
 if you a message such as
 ```
@@ -43,10 +39,9 @@ lynx: Can't access startfile http://rawgit.com/transcode-open/apt-cyg/master/apt
 ```
 Then there was a problem installing cygwin. You should download cygwin without using chocolatey by going to cygwin.com
 
-Then install lots of stuff. But NOT!! cmake. The version in the repos is corrupt. We will compile cmake from source.
+Then install lots of stuff.
 ```
-apt-cyg install wget git libelf0-devel zlib-devel libicu-devel libgpgme-devel libgpg-error-devel openssl-devel tcsh libncurses-devel gcc4-g++ gdb automake make flex bison libnettle-devel libnettle
-hash -r
+apt-cyg install cmake wget git libelf0-devel zlib-devel libicu-devel libgpgme-devel libgpg-error-devel openssl-devel tcsh libncurses-devel gcc4-g++ gdb automake make flex bison libnettle-devel libgcrypt-devel libcrypt-devel
 ```
 
 Install both libconfig and cmake from source:
@@ -55,11 +50,14 @@ git clone https://github.com/hyperrealm/libconfig && cd libconfig
 git checkout v1.5
 autoheader && aclocal && automake --add-missing --copy && autoconf && ./configure
 make && make install
-cd
-wget --no-check-certificate https://cmake.org/files/v3.4/cmake-3.4.0.tar.gz
-tar xzvf cmake-3.4.0.tar.gz
-cd cmake-3.4.0
-./bootstrap && make && make install
+```
+
+To compile and run GT.M you need to install and start the cygserver. (During compilation, it's used to build the GT.M help files which are actual GT.M databases.)
+
+In an administrator cygwin-terminal (right click cygwin-terminal and click run as administrator)
+```
+/usr/bin/cygserver-config
+net start cygserver
 ```
 
 Now, compile GT.M:
@@ -69,13 +67,6 @@ git clone https://github.com/shabiel/fis-gtm && cd fis-gtm
 git checkout cygwin
 cmake .
 make
-make install
 ```
 
-To run GT.M you need to install and start the cygserver
-
-In an administrator cygwin-terminal (right click cygwin-terminal and click run as administrator)
-```
-/usr/bin/cygserver-config
-net start cygserver
-```
+Follow the original README on how to install GT.M. In short, `make install` makes an installable package; and you then need to do ./configure to actually install GT.M.
