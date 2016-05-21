@@ -17,17 +17,86 @@
 #include "mdq.h"
 #include "fullbool.h"
 
+GBLREF	boolean_t	run_time;
+GBLREF	int		source_column;
+
 error_def(ERR_VAREXPECTED);
+error_def(ERR_QUERY2);
+
+enum query_obj {
+	GLOBAL = 0,
+	LOCAL,
+	INDIRECT,
+	LAST_OBJECT
+};
+
+enum query_dir {
+	FORWARD = 0,
+	BACKWARD,
+	TBD,
+	LAST_DIRECTION
+};
 
 int f_query(oprtype *a, opctype op)
 {
-	triple		*oldchain, *r, *r0, *r1;
+	enum query_dir	direction;
+	enum query_obj	object;
+	int4		intval;
 	save_se		save_state;
+	opctype		gv_oc;
+	oprtype		control_slot, dir_opr, *dir_oprptr, *next_oprptr;
+	short int	column;
+	triple		*oldchain, *r, *r0, *r1;
+	triple		*sav_dirref, *sav_gv1, *sav_gvn, *sav_lvn, *sav_ref, *share, *triptr;
+	triple		*chain2, *obp, tmpchain2;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (TK_IDENT == TREF(window_token))
+	oldchain = sav_dirref = NULL;			/* default to no direction and no shifting indirection */
+	used_glvn_slot = FALSE;
+	r = maketriple(OC_NOOP);			/* We'll fill in the opcode later, when we figure out what it is */
+	switch (TREF(window_token))
 	{
+	case TK_IDENT:
+		object = LOCAL;
+		ok = lvn(&r->operand[0], OC_FNQUERY, r);	/* TODO COME BACK *-* 2nd arg causes us to mess below with return from lvn */
+		next_oprptr = &r->operand[1];
+		break;
+	case TK_CIRCUMFLEX:
+		object = GLOBAL;
+		sav_gv1 = TREF(curtchain);
+		ok = gvn();
+		sav_gvn = (TREF(curtchain))->exorder.bl;/
+		if (OC_GVRECTARG == sav_gvn->opcode)
+		{	/* because of shifting if we need to find it, look in the expr_start chain */
+			assert(TREF(shift_side_effects));
+			assert(((sav_gvn->operand[0].oprval.tref) == TREF(expr_start)) && (NULL != TREF(expr_start_orig)));
+			sav_gv1 = TREF(expr_start_orig);
+			sav_gvn = TREF(expr_start);
+		}
+		next_oprptr = &r->operand[0];
+		break;
+	case TK_ATSIGN:
+		object = INDIRECT;
+		if (SHIFT_SIDE_EFFECTS)
+			START_GVBIND_CHAIN(&save_state, oldchain);
+		ok = indirection(&r->operand[0]);
+		next_oprptr = &r->operand[1];
+		break;
+	default:
+		ok = FALSE;
+		break;
+	}
+	if (!ok)
+	{
+		if (NULL != oldchain)
+			setcurtchain(oldchain);
+		stx_error(ERR_VAREXPECTED);
+		return FALSE;
+	}
+	if (TK_COMMA != TREF(window_token))
+
+	if (TK_IDENT == TREF(window_token))
 		if (!lvn(a, OC_FNQUERY, 0))
 			return FALSE;
 		assert(TRIP_REF == a->oprclass);
@@ -97,8 +166,48 @@ int f_query(oprtype *a, opctype op)
 		default:
 			stx_error(ERR_VAREXPECTED);
 			return FALSE;
+		}
+
+	  *a = put_tref(r);
 	}
-	*a = put_tref(r);
+	/* START HERE */
+	if (TK_COMMA != TREF(window_token))
+		direction = FORWARD;	/* default direction */
+	else
+	{	/* two argument form: ugly logic for direction */
+		advancewindow();
+		column = source_column;
+		dir_oprptr = (oprtype *)mcalloc(SIZEOF(oprtype));
+		dir_opr = put_indr(dir_oprptr);
+		sav_ref = newtriple(OC_GVSAVTARG);
+		DISABLE_SIDE_EFFECT_AT_DEPTH;		/* doing this here let's us know specifically if direction had SE threat */
+		if (EXPR_FAIL == expr(dir_oprptr, MUMPS_EXPR))
+		{
+			if (NULL != oldchain)
+				setcurtchain(oldchain);
+			return FALSE;
+		}
+		assert(TRIP_REF == dir_oprptr->oprclass);
+		triptr = dir_oprptr->oprval.tref;
+		if (OC_LIT == triptr->opcode)
+		{	/* if direction is a literal - pick it up and stop flailing about */
+			if (MV_IS_TRUEINT(&triptr->operand[0].oprval.mlit->v, &intval) && (1 == intval || -1 == intval))
+			{
+				direction = (1 == intval) ? FORWARD : BACKWARD;
+				sav_ref->opcode = OC_NOOP;
+				sav_ref = NULL;
+			} else
+			{	/* bad direction */
+				if (NULL != oldchain)
+					setcurtchain(oldchain);
+				stx_error(ERR_QUERY2);
+				return FALSE;
+			}
+		} else
+		{
+			direction = TBD;
+		}
 	}
+
 	return TRUE;
 }
