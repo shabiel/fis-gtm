@@ -93,6 +93,24 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	endif
 endif
 
+# Cygwin
+ifneq (,$(findstring CYGWIN,$(UNAMESTR)))
+	# -fPIC for Position Independent Code. -- Doesn't apply to Cygwin
+	#CFLAGS += -fPIC
+	LDFLAGS = -lgtmshr -lcrypto
+	# So that dependent libraries are loaded from the parent library's load path at runtime
+	RPATHFLAGS = -Wl,-rpath,'$$ORIGIN'
+	# So that we can build shared library.
+	LDSHR = -shared
+	IFLAGS += -I /usr/local/ssl/include
+	ifeq ($(BIT64),0)
+		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86_64-linux-gnu
+	else
+		LIBFLAGS += -L /usr/local/ssl/lib -L $(gtm_dist)
+	endif
+	default_thirdparty_LDFLAGS += -Wl,--out-implib,libgtmcryptutil.dll
+endif
+
 # Solaris
 ifneq (,$(findstring Solaris,$(UNAMESTR)))
 	# -fPIC for Position Independent Code; -m64 for 64-bit
@@ -156,7 +174,7 @@ endif
 CFLAGS += $(IFLAGS)
 LDFLAGS += $(LIBFLAGS) -o
 
-COMMON_LIBS = -lgtmcryptutil -lconfig
+COMMON_LIBS = -lgtmcryptutil -lconfig 
 
 # Lists of all files needed for building the encryption plugin.
 crypt_util_srcfiles = gtmcrypt_util.c
