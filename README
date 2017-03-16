@@ -77,3 +77,9 @@ FAQ:
   This indicates that required libraries are not found. Please consult the list
   of libraries and check your distributions package manager.
 
+FreeBSD Notes:
+You need to pkg install the following to compile GT.M:
+
+git cmake icu libconfig libgcrypt gpgme gcc48 [gdb]
+
+Set CMAKE_C_COMPILER to be /usr/local/bin/gcc48.
