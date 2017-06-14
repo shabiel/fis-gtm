@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,10 +13,6 @@
 #include "mdef.h"
 
 #include <errno.h>
-#ifdef VMS
-#include <descrip.h>	/* Required for gtmsource.h */
-#include <nam.h>	/* Required for the nam$l_esa members */
-#endif
 
 #include "gtm_inet.h"	/* Required for gtmsource.h */
 #include "gdsroot.h"
@@ -39,13 +35,10 @@
 #include "gtmsource.h"
 #include "gtmrecv.h"
 #include "error.h"
-#ifdef UNIX
 #include "io.h"
 #include "gtmsecshr.h"
 #include "mutex.h"
 #include "ftok_sems.h"
-#endif
-
 #include "tp_change_reg.h"
 #include "gds_rundown.h"
 #include "dpgbldir.h"
@@ -53,9 +46,10 @@
 #include "rc_cpt_ops.h"
 #include "gv_rundown.h"
 #include "targ_alloc.h"
-#if defined(DEBUG) && defined(UNIX)
+#ifdef DEBUG
 #include "anticipatory_freeze.h"
 #endif
+#include "aio_shim.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -64,8 +58,7 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	jnlpool_ctl_ptr_t      	jnlpool_ctl;
 GBLREF	gd_region		*ftok_sem_reg;
-
-#if defined(DEBUG) && defined(UNIX)
+#ifdef DEBUG
 GBLREF	boolean_t		is_jnlpool_creator;
 error_def(ERR_TEXT);
 #endif
@@ -77,34 +70,29 @@ void gv_rundown(void)
 	gd_addr		*addr_ptr;
 	sgm_info	*si;
 	int4		rundown_status = EXIT_NRM;			/* if gds_rundown went smoothly */
-#	ifdef VMS
-	vms_gds_info	*gds_info;
-#	elif UNIX
 	unix_db_info	*udi;
-#	endif
-#if defined(DEBUG) && defined(UNIX)
-	sgmnt_addrs		*csa;
+#	ifdef DEBUG
+	sgmnt_addrs	*csa;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-
 	r_save = gv_cur_region;		/* Save for possible core dump */
 	gvcmy_rundown();
 	ENABLE_AST
-
 	if (pool_init)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
 		for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
 		{
-			if (r_local->open && !r_local->was_open && dba_cm != r_local->dyn.addr->acc_meth)
-			{	/* Rundown has already occurred for GT.CM client regions through gvcmy_rundown() above.
+			if (r_local->open && (dba_cm != r_local->dyn.addr->acc_meth))
+			{
+				/* Rundown has already occurred for GT.CM client regions through gvcmy_rundown() above.
 			 	 * Hence the (dba_cm != ...) check in the if above. Note that for GT.CM client regions,
 				 * region->open is TRUE although cs_addrs is NULL.
 			 	 */
-#				if defined(DEBUG) && defined(UNIX)
+#				ifdef DEBUG
 				if (is_jnlpool_creator
 					&& INST_FREEZE_ON_NOSPC_ENABLED(REG2CSA(r_local)) && TREF(gtm_test_fake_enospc))
 				{	/* Clear ENOSPC faking now that we are running down */
@@ -120,77 +108,7 @@ void gv_rundown(void)
 #				endif
 				gv_cur_region = r_local;
 			        tp_change_reg();
-				UNIX_ONLY(rundown_status |=) gds_rundown();
-
-				/* Now that gds_rundown is done, free up the memory associated with the region.
-				 * Ideally the following memory freeing code should go to gds_rundown, but
-				 * GT.CM calls gds_rundown() and we want to reuse memory for GT.CM.
-				 */
-				if (NULL != cs_addrs)
-				{
-					if (NULL != cs_addrs->dir_tree)
-						FREE_CSA_DIR_TREE(cs_addrs);
-					if (cs_addrs->sgm_info_ptr)
-					{
-						si = cs_addrs->sgm_info_ptr;
-						/* It is possible we got interrupted before initializing all fields of "si"
-						 * completely so account for NULL values while freeing/releasing those fields.
-						 */
-						assert((si->tp_csa == cs_addrs) || (NULL == si->tp_csa));
-						if (si->jnl_tail)
-						{
-							PROBE_FREEUP_BUDDY_LIST(si->format_buff_list);
-							PROBE_FREEUP_BUDDY_LIST(si->jnl_list);
-						}
-						PROBE_FREEUP_BUDDY_LIST(si->recompute_list);
-						PROBE_FREEUP_BUDDY_LIST(si->new_buff_list);
-						PROBE_FREEUP_BUDDY_LIST(si->tlvl_info_list);
-						PROBE_FREEUP_BUDDY_LIST(si->tlvl_cw_set_list);
-						PROBE_FREEUP_BUDDY_LIST(si->cw_set_list);
-						if (NULL != si->blks_in_use)
-						{
-							free_hashtab_int4(si->blks_in_use);
-							free(si->blks_in_use);
-							si->blks_in_use = NULL;
-						}
-						if (si->cr_array_size)
-						{
-							assert(NULL != si->cr_array);
-							if (NULL != si->cr_array)
-								free(si->cr_array);
-						}
-						if (NULL != si->first_tp_hist)
-							free(si->first_tp_hist);
-						free(si);
-					}
-					if (cs_addrs->jnl)
-					{
-						assert(&FILE_INFO(cs_addrs->jnl->region)->s_addrs == cs_addrs);
-						if (cs_addrs->jnl->jnllsb)
-						{
-							UNIX_ONLY(assert(FALSE));
-							free(cs_addrs->jnl->jnllsb);
-						}
-						free(cs_addrs->jnl);
-					}
-				}
-				assert(gv_cur_region->dyn.addr->file_cntl->file_info);
-#				ifdef VMS
-				gds_info = (vms_gds_info *)gv_cur_region->dyn.addr->file_cntl->file_info;
-				if (gds_info->xabpro)
-					free(gds_info->xabpro);
-				if (gds_info->xabfhc)
-					free(gds_info->xabfhc);
-				if (gds_info->nam)
-				{
-					free(gds_info->nam->nam$l_esa);
-					free(gds_info->nam);
-				}
-				if (gds_info->fab)
-					free(gds_info->fab);
-#				endif
-				free(gv_cur_region->dyn.addr->file_cntl->file_info);
-				free(gv_cur_region->dyn.addr->file_cntl);
+				rundown_status |= gds_rundown(CLEANUP_UDI_TRUE);
 			}
 			r_local->open = r_local->was_open = FALSE;
 		}
@@ -198,14 +116,11 @@ void gv_rundown(void)
 	rc_close_section();
 	gv_cur_region = r_save;		/* Restore value for dumps but this region is now closed and is otherwise defunct */
 	cs_addrs = NULL;
-#ifdef UNIX
 	gtmsecshr_sock_cleanup(CLIENT);
-#ifndef MUTEX_MSEM_WAKE
+#	ifndef MUTEX_MSEM_WAKE
 	mutex_sock_cleanup();
-#endif
-#endif
+#	endif
 	jnlpool_detach();
-#	ifdef UNIX
 	/* Clean up any left-over ftok semaphores. This part of the code can be reached by almost all of the exit handling routines.
 	 * If the ftok semaphore is grabbed, but not released, ftok_sem_reg will have a non-null value and grabbed_ftok_sem will be
 	 * TRUE. We cannot rely on gv_cur_region always as it is used in so many places in so many ways.
@@ -241,8 +156,6 @@ void gv_rundown(void)
 		if (udi->grabbed_ftok_sem)
 			ftok_sem_release(recvpool.recvpool_dummy_reg, FALSE, TRUE);
 	}
-#	endif
-
 	if (EXIT_NRM != rundown_status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBRNDWN);
 }

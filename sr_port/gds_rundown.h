@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,15 +13,17 @@
 #ifndef GDS_RUNDOWN_INCLUDED
 #define GDS_RUNDOWN_INCLUDED
 
-#ifdef UNIX
-int4 gds_rundown(void);
+#define	CLEANUP_UDI_FALSE	FALSE
+#define	CLEANUP_UDI_TRUE	TRUE
+
+int4 gds_rundown(boolean_t cleanup_udi);
 
 #define CAN_BYPASS(SEMVAL, CSD, INST_IS_FROZEN)										\
-	(INST_IS_FROZEN													\
+	(INST_IS_FROZEN || FROZEN_CHILLED(CSD)										\
 		|| (IS_GTM_IMAGE && CSD->mumps_can_bypass && (PROC_FACTOR * (num_additional_processors + 1) < SEMVAL))	\
 		|| (((2 * DB_COUNTER_SEM_INCR) < SEMVAL) && (IS_LKE_IMAGE || IS_DSE_IMAGE)))
 
-#define CANCEL_DB_TIMERS(region, csa, cancelled_timer, cancelled_dbsync_timer)	\
+#define CANCEL_DB_TIMERS(region, csa, cancelled_dbsync_timer)			\
 {										\
 	if (csa->timer)								\
 	{									\
@@ -31,7 +33,7 @@ int4 gds_rundown(void);
 			DECR_CNT(&csa->nl->wcs_timers, &csa->nl->wc_var_lock);	\
 			REMOVE_WT_PID(csa);					\
 		}								\
-		cancelled_timer = TRUE;						\
+		csa->canceled_flush_timer = TRUE;				\
 		csa->timer = FALSE;						\
 	}									\
 	if (csa->dbsync_timer)							\
@@ -46,10 +48,6 @@ int4 gds_rundown(void);
 #	define PROC_FACTOR	2
 #else
 #	define PROC_FACTOR	20
-#endif
-
-#else
-void gds_rundown(void);
 #endif
 
 #endif /* GDS_RUNDOWN_INCLUDED */

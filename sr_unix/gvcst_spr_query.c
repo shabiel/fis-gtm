@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +12,9 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+
+#include "gtmio.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -23,7 +27,7 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
-
+#include "io.h"
 #include "gvcst_protos.h"
 #include "change_reg.h"
 #include "op.h"
@@ -49,7 +53,7 @@ boolean_t	gvcst_spr_query(void)
 	boolean_t	est_first_pass;
 	boolean_t	found, cumul_found;
 	int		reg_index;
-	gd_binding	*start_map, *end_map, *map, *prev_end_map;
+	gd_binding	*start_map, *end_map, *map, *prev_end_map, *stop_map;
 	gd_region	*reg, *gd_reg_start;
 	gd_addr		*addr;
 	gv_namehead	*start_map_gvt;
@@ -74,8 +78,15 @@ boolean_t	gvcst_spr_query(void)
 	assert(NULL != gvnh_reg);
 	assert(NULL != gvnh_reg->gvspan);
 	/* Now that we know the keyrange maps to more than one region, go through each of them and do the $query
-	 * Since multiple regions are potentially involved, need a TP fence.
+	 * Since multiple regions are potentially involved, need a TP fence. But before that, open any statsDBs pointed
+	 * to by map entries from "start_map" to "stop_map" (as their open will be deferred once we go into TP). Not
+	 * opening them before the TP can produce incomplete results from the $query operation.
 	 */
+	assert(0 < gvnh_reg->gvspan->end_map_index);
+	assert(gvnh_reg->gvspan->end_map_index < addr->n_maps);
+	stop_map = &addr->maps[gvnh_reg->gvspan->end_map_index];
+	for (map = start_map; map <= stop_map; map++)
+		OPEN_BASEREG_IF_STATSREG(map);
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	if (!dollar_tlevel)
 	{
@@ -93,9 +104,7 @@ boolean_t	gvcst_spr_query(void)
 	cumul_key_len = 0;
 	DEBUG_ONLY(cumul_key[cumul_key_len] = KEY_DELIMITER;)
 	INCREMENT_GD_TARG_TN(gd_targ_tn); /* takes a copy of incremented "TREF(gd_targ_tn)" into local variable "gd_targ_tn" */
-	assert(0 < gvnh_reg->gvspan->end_map_index);
-	assert(gvnh_reg->gvspan->end_map_index < addr->n_maps);
-	end_map = &addr->maps[gvnh_reg->gvspan->end_map_index];
+	end_map = stop_map;
 	/* Verify that initializations that happened before op_tstart are still unchanged */
 	assert(addr == TREF(gd_targ_addr));
 	assert(tn_array == TREF(gd_targ_reg_array));
@@ -105,6 +114,7 @@ boolean_t	gvcst_spr_query(void)
 		 * Note down the smallest key found across the scanned regions until we find a key that belongs to the
 		 * same map (in the gld) as the currently scanned "map". At which point, the region-spanning query is done.
 		 */
+		ASSERT_BASEREG_OPEN_IF_STATSREG(map);	/* "OPEN_BASEREG_IF_STATSREG" call above should have ensured that */
 		reg = map->reg.addr;
 		GET_REG_INDEX(addr, gd_reg_start, reg, reg_index);	/* sets "reg_index" */
 		assert((map != start_map) || (tn_array[reg_index] != gd_targ_tn));

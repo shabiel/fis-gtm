@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,17 +14,6 @@
 
 #include <stddef.h>		/* for offsetof macro */
 
-#if defined(VMS)
-#include <climsgdef.h>
-#include <fab.h>
-#include <rms.h>
-#include <errno.h>
-#include <nam.h>
-#include <psldef.h>
-#include <rmsdef.h>
-#include <descrip.h>
-#include <math.h> /* needed for handling of epoch_interval (EPOCH_SECOND2SECOND macro uses ceil) */
-#endif
 #include "gtm_string.h"
 #include "gtm_time.h"
 #include "gtm_stdio.h"
@@ -56,6 +45,8 @@
 #include "send_msg.h"
 #include "gtmio.h"
 #include "is_file_identical.h"
+#include "interlock.h"
+#include "anticipatory_freeze.h"
 
 #define	DB_OR_REG_SIZE	MAX(STR_LIT_LEN(FILE_STR), STR_LIT_LEN(REG_STR)) + 1 /* trailing null byte */
 
@@ -92,12 +83,11 @@ error_def(ERR_JNLSWITCHTOOSM);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_MUSTANDALONE);
+error_def(ERR_OFRZACTIVE);
 error_def(ERR_PREVJNLLINKCUT);
 error_def(ERR_REPLSTATE);
 error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
-
-VMS_ONLY(static  const   unsigned short  zero_fid[3];)
 
 uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 {
@@ -126,17 +116,19 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	jnl_tm_t		save_gbl_jrec_time;
-#	ifdef UNIX
 	int			jnl_fd;
 	jnl_file_header		header;
 	int4			status1;
 	uint4			status2;
 	boolean_t		header_is_usable = FALSE, noprevlink_requested;
-#	endif
 	boolean_t		jnl_buffer_updated = FALSE, jnl_buffer_invalid = FALSE;
 	int			jnl_buffer_size;
 	char			s[JNLBUFFUPDAPNDX_SIZE];	/* JNLBUFFUPDAPNDX_SIZE is defined in jnl.h */
+	unix_db_info		*udi;
+	gd_segment		*seg;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(SGMNT_HDR_LEN == ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
 	memset(&jnl_info, 0, SIZEOF(jnl_info));
 	jnl_info.status = jnl_info.status2 = SS_NORMAL;
@@ -175,26 +167,25 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		rptr->sd = NULL;
 		if (region)
 		{
-			if (dba_usr == rptr->reg->dyn.addr->acc_meth)
+			seg = rptr->reg->dyn.addr;
+			if (dba_usr == seg->acc_meth)
 			{
 				gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Journaling is not supported for access method USR"));
 				exit_status |= EXIT_WRN;
 				continue;
 			}
-			if (!mupfndfil(rptr->reg, NULL))
+			if (!mupfndfil(rptr->reg, NULL, LOG_ERROR_TRUE))
 			{
 				exit_status |= EXIT_ERR;
 				continue;
 			}
 			gv_cur_region = rptr->reg;
-			if (NULL == gv_cur_region->dyn.addr->file_cntl)
+			if (NULL == seg->file_cntl)
 			{
-				gv_cur_region->dyn.addr->acc_meth = dba_bg;
-				gv_cur_region->dyn.addr->file_cntl =
-					(file_control *)malloc(SIZEOF(*gv_cur_region->dyn.addr->file_cntl));
-				memset(gv_cur_region->dyn.addr->file_cntl, 0, SIZEOF(*gv_cur_region->dyn.addr->file_cntl));
-				gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
+				seg->file_cntl =
+					(file_control *)malloc(SIZEOF(*seg->file_cntl));
+				memset(seg->file_cntl, 0, SIZEOF(*seg->file_cntl));
 				gds_info = FILE_INFO(gv_cur_region);
 				gds_info = (GDS_INFO *)malloc(SIZEOF(GDS_INFO));
 				memset(gds_info, 0, SIZEOF(GDS_INFO));
@@ -202,11 +193,12 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		} else
 		{
 			mu_gv_cur_reg_init();
+			seg = gv_cur_region->dyn.addr;
 			rptr->reg = gv_cur_region;
-			gv_cur_region->dyn.addr->fname_len = db_fn_len;
-			memcpy(gv_cur_region->dyn.addr->fname, db_fn, db_fn_len);
+			seg->fname_len = db_fn_len;
+			memcpy(seg->fname, db_fn, db_fn_len);
 		}
-		fc = gv_cur_region->dyn.addr->file_cntl;
+		fc = seg->file_cntl;
 		/* open shared to see what's possible */
 		gvcst_init(gv_cur_region);
 		tp_change_reg();
@@ -221,16 +213,33 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			continue;
 		}
 		grab_crit(gv_cur_region);  /* corresponding rel_crit() is done in mupip_set_jnl_cleanup() */
+		if (FROZEN_CHILLED(cs_data))
+		{	/* While a FREEZE -ONLINE was in place, all processes exited, leaving the
+			 * shared memory up. Either autorelease, if enabled, or error out.
+			 */
+			DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
+			if (FROZEN_CHILLED(cs_data))
+			{
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(gv_cur_region));
+				exit_status |= EXIT_WRN;
+				gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE);
+				exit_status |= gds_rundown_status;
+				rptr->sd = NULL;
+				rptr->state = NONALLOCATED;	/* This means do not call "gds_rundown" again for this region
+								 * and do not process this region anymore. */
+				continue;
+			}
+		}
 		/* Now determine new journal state, replication state and before_image for this region.
 		 * Information will be kept in "rptr", which is per region.
 		 * Note that we have done grab_crit(), so we are safe on deciding state transitions */
 		if (EXIT_NRM != (status = mupip_set_journal_newstate(&jnl_options, &jnl_info, rptr)))
 		{
 			exit_status |= status;
-			UNIX_ONLY(gds_rundown_status =) gds_rundown();
+			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE);
 			exit_status |= gds_rundown_status;
 			rptr->sd = NULL;
-			rptr->state = NONALLOCATED;	/* This means do not call gds_rundown() again for this region
+			rptr->state = NONALLOCATED;	/* This means do not call "gds_rundown" again for this region
 							 * and do not process this region anymore. */
 			continue;
 		}
@@ -257,24 +266,25 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			(repl_closed != repl_curr_state && repl_closed == rptr->repl_new_state) ||
 			(repl_closed == repl_curr_state && repl_open == rptr->repl_new_state))
 		{
-			/* Since we did gvcst_init() and now will call mu_rndwn_file() */
-			UNIX_ONLY(gds_rundown_status =) gds_rundown();
+			/* Rundown the database file since we did "gvcst_init" and now will call "mu_rndwn_file".
+			 * Since we are going to reuse the udi etc. that was allocated, use CLEANUP_UDI_FALSE.
+			 */
+			gds_rundown_status = gds_rundown(CLEANUP_UDI_FALSE);
 			exit_status |= gds_rundown_status;
 			rptr->state = NONALLOCATED;
 			rptr->sd = csd = NULL;
 			/* WARNING: The remaining code uses gv_cur_region and others
 			 * on the assumption that gds_rundown does not deallocate the space when it closes the file */
 			assert(NULL != gv_cur_region);
-			assert(NULL != gv_cur_region->dyn.addr);
-			assert(NULL != gv_cur_region->dyn.addr->file_cntl);
-			assert(NULL != gv_cur_region->dyn.addr->file_cntl->file_info);
+			assert(NULL != seg);
+			assert(NULL != seg->file_cntl);
+			assert(NULL != seg->file_cntl->file_info);
 			if (EXIT_NRM != gds_rundown_status)		/* skip mu_rndwn_file (STANDALONE) */
 				continue;
 			if (STANDALONE(gv_cur_region))
 			{
 				rptr->exclusive = TRUE;
 				fc->op = FC_OPEN;
-				fc->file_type = dba_bg;
 				status = dbfilop(fc);
 				if (SS_NORMAL != status)
 				{
@@ -282,11 +292,16 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					exit_status |= EXIT_ERR;
 					continue;
 				}
-				/* Need to read file header again,
-				 * because mu_rndwn_file does not have an interface to return fileheader */
+				/* Need to read file header again, because mu_rndwn_file does not have an interface
+				 * to return fileheader. Note if asyncio=TRUE, file would have been opened with
+				 * O_DIRECT in which case DIO alignment needs to be ensured. So use an aligned buffer
+				 * in between to do the disk read.
+				 */
 				csd = (sgmnt_data_ptr_t)malloc(SGMNT_HDR_LEN);
+				udi = FC2UDI(fc);
 				fc->op = FC_READ;
-				fc->op_buff = (sm_uc_ptr_t)csd;
+				fc->op_buff = !udi->fd_opened_with_o_direct
+							? (sm_uc_ptr_t)csd : (sm_uc_ptr_t)(TREF(dio_buff)).aligned;
 				fc->op_len = SGMNT_HDR_LEN;
 				fc->op_pos = 1;
 				status = dbfilop(fc);
@@ -298,6 +313,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					exit_status |= EXIT_ERR;
 					continue; /* Later mupip_set_jnl_cleanup() will do the cleanup */
 				}
+				if (udi->fd_opened_with_o_direct)
+					memcpy(csd, (TREF(dio_buff)).aligned, SGMNT_HDR_LEN);
 				cs_addrs->hdr = cs_data = rptr->sd = csd;
 				rptr->state = ALLOCATED;
 			} else
@@ -333,14 +350,16 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		this_iter_prevlinkcut_error = do_prevlinkcut_error;
 		do_prevlinkcut_error = FALSE;
 		next_rptr = rptr->fPtr;
+		if (NULL == rptr->sd)
+			continue;
+		assert(NONALLOCATED != rptr->state);
 		gv_cur_region = rptr->reg;
 		if (gv_cur_region->read_only)
 			continue;
-		tp_change_reg(); /* cs_data and cs_addrs are used in functions called from here */
+		/* cs_data and cs_addrs are used in functions called from here */
+		cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
+		assert(rptr->sd == cs_addrs->hdr);
 		cs_data = csd = rptr->sd;
-		assert(NULL != csd || NONALLOCATED == rptr->state);
-		if (NULL == csd)	/* Just to be safe. May be this is not necessary. */
-			continue;
 		jnl_curr_state = (enum jnl_state_codes)csd->jnl_state;
 		repl_curr_state = (enum repl_state_codes)csd->repl_state;
 		jnl_info.csd = csd;
@@ -350,9 +369,10 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		jnl_info.jnl_state = csd->jnl_state;
 		/* note that even replication on to off will create new journals */
 		newjnlfiles = (jnl_open == rptr->jnl_new_state) ?  TRUE : FALSE;
-		fc = gv_cur_region->dyn.addr->file_cntl;
-		jnl_info.fn = gv_cur_region->dyn.addr->fname;
-		jnl_info.fn_len = gv_cur_region->dyn.addr->fname_len;
+		seg = gv_cur_region->dyn.addr;
+		fc = seg->file_cntl;
+		jnl_info.fn = seg->fname;
+		jnl_info.fn_len = seg->fname_len;
 		if (region)
 		{
 			strcpy(db_or_reg, REG_STR);
@@ -455,14 +475,12 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 							jnl_info.jnl_len, jnl_info.jnl);
 				exit_status |= EXIT_ERR;
 				break;
-#			ifdef UNIX
 			} else if (jnl_info.alloc + jnl_info.extend > jnl_info.autoswitchlimit
 					&& jnl_info.alloc != jnl_info.autoswitchlimit)
 			{
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, jnl_info.alloc,
 						jnl_info.autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region));
 				jnl_info.alloc = jnl_info.autoswitchlimit;
-#			endif
 			} else
 			{
 				align_autoswitch = ALIGNED_ROUND_DOWN(jnl_info.autoswitchlimit, jnl_info.alloc, jnl_info.extend);
@@ -530,7 +548,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				}
 			} else
 				curr_stat_res = new_stat_res; /* new_stat_res is already set */
-#			ifdef UNIX
 			if (newjnlfiles)
 			{
 				jnl_points_to_db = FALSE;
@@ -540,7 +557,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					 */
 					assert('\0' == jnlfile.addr[jnlfile.len]);
 					jnlfile.addr[jnlfile.len] = '\0';	/* just in case above assert is FALSE */
-					OPENFILE(jnlfile.addr, O_RDONLY, jnl_fd);
+					OPENFILE(jnlfile.addr, ((FILE_READONLY & curr_stat_res) ? O_RDONLY : O_RDWR), jnl_fd);
+
 				} else if (FILE_PRESENT & new_stat_res)
 				{	/* Check if the new journal file (that we know exists) points back to this database file.
 					 * If not, the journal file prev links should be cut in the new journal file.
@@ -550,7 +568,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					OPENFILE((char *)jnl_info.jnl, O_RDONLY, jnl_fd);
 				} else
 					jnl_fd = FD_INVALID;
-				if (0 <= jnl_fd)
+				if (FD_INVALID != jnl_fd)
 				{
 					DO_FILE_READ(jnl_fd, 0, &header, SIZEOF(header), status1, status2);
 					if (SS_NORMAL == status1)
@@ -564,10 +582,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 							header.data_file_name[header.data_file_name_length] = '\0';
 							assert('\0' == jnl_info.fn[jnl_info.fn_len]);
 							jnl_info.fn[jnl_info.fn_len] = '\0';
-							if (is_file_identical((char *)header.data_file_name,
-												(char *)jnl_info.fn))
+							if (is_file_identical((char *)header.data_file_name, (char *)jnl_info.fn))
 								jnl_points_to_db = TRUE;
-							UNIX_ONLY(header_is_usable = TRUE;)
+							header_is_usable = TRUE;
 						}
 					}
 				}
@@ -580,7 +597,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				if ((FILE_PRESENT & curr_stat_res) && !noprevlink_requested)
 				{
 					keep_prev_link = jnl_points_to_db;
-					safe_to_switch = (jnlname_same && keep_prev_link);
+					safe_to_switch = (jnlname_same && jnl_points_to_db);
 				} else if ((FILE_PRESENT & new_stat_res) && !noprevlink_requested)
 				{
 					keep_prev_link = FALSE;
@@ -592,8 +609,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					safe_to_switch = jnl_points_to_db;
 				} else
 				{
-					keep_prev_link = FALSE;	/* since current and new jnl file both dont exist */
-					safe_to_switch = TRUE;	/* since current and new jnl file both dont exist */
+					keep_prev_link = FALSE;	/* since current and new jnl file both don't exist */
+					safe_to_switch = TRUE;	/* since current and new jnl file both don't exist */
 				}
 				if ((FILE_PRESENT & new_stat_res) && !safe_to_switch)
 				{
@@ -605,9 +622,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					break;
 				}
 			}
-#			else
-			keep_prev_link = TRUE;
-#			endif
 			if (jnl_open != jnl_curr_state)
 				curr_jnl_present = FALSE;
 			else
@@ -644,10 +658,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				{
 					assert(NULL != cs_addrs->nl);
 					jpc = cs_addrs->jnl;
-					UNIX_ONLY(if (cs_addrs->nl->jnl_file.u.inode))
-					VMS_ONLY(if (memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid))))
+					if (cs_addrs->nl->jnl_file.u.inode)
 					{
-						if (SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_SETJNL)))
+						if (SS_NORMAL != (status = set_jnl_file_close()))
 						{	/* Invoke jnl_file_lost to turn off journaling and retry journal creation
 							 * to create fresh journal files.
 							 */
@@ -656,12 +669,12 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 										      * information message */
 							next_rptr = rptr;
 							continue;
-						}
-						UNIX_ONLY(header.crash = FALSE;)	/* Even if the journal was crashed, that
-											 * should be fixed now */
+						} else
+							header.crash = FALSE;	/* Even if the journal was crashed, that
+										 * should be fixed now */
 					} else
 					{	/* Ideally, no other process should have a journal file for this database open.
-						 * But, As part of C9I03-002965, we realized it is possible for processes accessing
+						 * But, as part of C9I03-002965, we realized it is possible for processes accessing
 						 * the older journal file to continue to write to it even though
 						 * csa->nl->jnl_file.u.inode field is 0. The only way to signal other proceses, that
 						 * have the jnl file open, of a concurrent journal file switch, is by incrementing
@@ -670,24 +683,31 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 						 */
 						assert(NULL != jpc);
 						jpc->jnl_buff->cycle++;
+						if (header_is_usable && !(FILE_READONLY & curr_stat_res))
+						{
+							jnl_set_fd_prior(jnl_fd, cs_addrs, cs_data, &header);
+							jnl_fd = NOJNL;	/* Mark the fd as closed */
+						}
 					}
-#					ifdef UNIX
 					/* Cut the link if the journal is crashed and there is no shared memory around */
 					if (header_is_usable && header.crash)
 						keep_prev_link = FALSE;
-#					endif
-					/* For MM, set_jnl_file_close() can call wcs_flu() which can remap the file.
+					/* For MM, "set_jnl_file_close" can call wcs_flu() which can remap the file.
 					 * So reset csd and rptr->sd since their value may have changed.
 					 */
 					assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
 					rptr->sd = csd = cs_data;
 				} else if ((jnl_closed == jnl_curr_state) && (jnl_open == rptr->jnl_new_state))
-				{	/* sync db for closed->open transition. for VMS WCSFLU_FSYNC_DB is ignored */
+				{	/* sync db for closed->open transition. */
 					wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR);
 					/* In case this is MM and wcs_flu() remapped an extended database, reset csd and rptr->sd */
 					assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
 					rptr->sd = csd = cs_data;
 				}
+			} else if (curr_jnl_present && header_is_usable && !(FILE_READONLY & curr_stat_res))
+			{	/* Close out journal in standalone case */
+				jnl_set_fd_prior(jnl_fd, cs_addrs, cs_data, &header);
+				jnl_fd = NOJNL;	/* Mark the fd as closed */
 			}
 			if (newjnlfiles)
 			{
@@ -697,17 +717,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				{
 					if (!(jnl_info.repl_state == repl_open && repl_open != repl_curr_state))
 					{ /* record the back link */
-#						ifdef VMS
-						if (!jnlname_same && (FILE_PRESENT & new_stat_res))
-						{
-							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4)
-									ERR_FILEEXISTS, 2, jnl_info.jnl_len, jnl_info.jnl);
-							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4)
-									ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
-							exit_status |= EXIT_ERR;
-							break;
-						}
-#						endif
 						if (keep_prev_link)
 						{	/* Save journal link */
 							jnl_info.prev_jnl_len = csd->jnl_file_len;
@@ -718,9 +727,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					}
 				}
 				if ((jnl_closed == jnl_curr_state) && (NULL != cs_addrs->nl))
-				{ /* Cleanup the jnl file info in shared memory before switching journal file.
-				     This case occurs if mupip set -journal is run after jnl_file_lost() closes
-				     journaling on a region */
+				{	/* Cleanup the jnl file info in shared memory before switching journal file. This case
+					 * occurs if mupip set -journal is run after jnl_file_lost() closes journaling on a region.
+					 */
 					NULLIFY_JNL_FILE_ID(cs_addrs);
 				}
 				jnl_info.blks_to_upgrd = csd->blks_to_upgrd;
@@ -749,7 +758,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 						jnl_info.jnl_len, jnl_info.jnl, DB_LEN_STR(gv_cur_region));
 				}
                         }
-			/* Following jnl_before_image, jnl_state, repl_state are unique charecteristics per region */
+			/* Following jnl_before_image, jnl_state, repl_state are unique characteristics per region */
 			csd->jnl_before_image = jnl_info.before_images;
 			csd->jnl_state = rptr->jnl_new_state;
 			csd->repl_state = jnl_info.repl_state;
@@ -781,9 +790,13 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			csd->reg_seqno = jnl_info.reg_seqno;
 			if (jnl_options.sync_io_specified)
 				csd->jnl_sync_io = jnl_options.sync_io;
-			UNIX_ONLY(csd->yield_lmt = jnl_options.yield_limit;)
+			csd->yield_lmt = jnl_options.yield_limit;
 		} else
-		{	/* Journaling is to be disabled for this region. Reset all fields */
+		{	/* Journaling is to be disabled for this region. */
+			/* Mark the current journal as switched, if possible. */
+			if (jnl_open == csd->jnl_state)
+				jnl_set_cur_prior(gv_cur_region, NULL, csd);
+			/* Reset all fields */
 			csd->jnl_before_image = FALSE;
 			csd->jnl_state = jnl_notallowed;
 			csd->repl_state = repl_closed;
@@ -795,7 +808,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			csd->jnl_deq = 0;
 			csd->jnl_file_len = 0;
 			csd->jnl_sync_io = FALSE;
-			UNIX_ONLY(csd->yield_lmt = DEFAULT_YIELD_LIMIT;)
+			csd->yield_lmt = DEFAULT_YIELD_LIMIT;
 		}
 		if (CLI_ABSENT != jnl_options.cli_journal || CLI_ABSENT != jnl_options.cli_replic_on)
 			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLSTATE, 6, db_or_reg_len, db_or_reg, db_reg_name_len,
@@ -803,9 +816,19 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		if (CLI_ABSENT != jnl_options.cli_replic_on)
 			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_REPLSTATE, 6, db_or_reg_len, db_or_reg, db_reg_name_len,
 					db_reg_name, LEN_AND_STR(repl_state_lit[jnl_info.repl_state]));
-		/* Write the updated information back to the database file */
+		/* Write the updated information back to the database file.
+		 * Note if asyncio=TRUE, file would have been opened with O_DIRECT in which case
+		 * DIO alignment needs to be ensured. So use an aligned buffer in between to do the write.
+		 */
 		fc->op = FC_WRITE;
-		fc->op_buff = (sm_uc_ptr_t)csd;
+		udi = FC2UDI(fc);
+		if (!udi->fd_opened_with_o_direct)
+			fc->op_buff = (sm_uc_ptr_t)csd;
+		else
+		{
+			memcpy((TREF(dio_buff)).aligned, csd, SGMNT_HDR_LEN);
+			fc->op_buff = (sm_uc_ptr_t)(TREF(dio_buff)).aligned;
+		}
 		fc->op_len = SGMNT_HDR_LEN;
 		fc->op_pos = 1;
 		status = dbfilop(fc);

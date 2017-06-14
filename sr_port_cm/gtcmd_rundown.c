@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,10 +41,6 @@ GBLREF	jnl_gbls_t		jgbl;
 
 error_def(ERR_NOTALLDBRNDWN);
 
-#ifdef VMS
-GBLREF short		gtcm_ast_avail;
-#endif
-
 void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 {
 	int4			link;
@@ -54,7 +51,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 	jnl_buffer_ptr_t	jbp;
 	int			refcnt;
 	boolean_t		was_crit;
-	int4			rundown_status = EXIT_NRM;			/* if gds_rundown went smoothly */
+	int4			rundown_status = EXIT_NRM;			/* if "gds_rundown" went smoothly */
 
 	for (ptr = cnx->region_root;  ptr;)
 	{
@@ -76,13 +73,14 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 				 * journal records (if it decides to switch to a new journal file).
 				 */
 				ADJUST_GBL_JREC_TIME(jgbl, jbp);
-				jnl_status = jnl_ensure_open();
+				jnl_status = jnl_ensure_open(gv_cur_region, cs_addrs);
 				if (0 == jnl_status)
 				{
 					if (0 != jpc->pini_addr)
 						jnl_put_jrt_pfin(cs_addrs);
 				} else
-					send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
+					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) jnl_status, 4,
+							JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
 			}
 			if (!was_crit)
 				rel_crit(gv_cur_region);
@@ -98,12 +96,13 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 		 */
 		assert(0 <= refcnt);
 		if (0 == refcnt)
-		{	/* free up only as little as needed to facilitate structure reuse when the region is opened again */
+		{	/* Free up only as little as needed to facilitate structure reuse when the region is opened again.
+			 * Hence the CLEANUP_UDI_FALSE use below.
+			 */
 			assert(region->head.fl == region->head.bl);
-			VMS_ONLY(gtcm_ast_avail++);
 			if (JNL_ALLOWED(cs_data))
 				jpc->pini_addr = 0;
-			UNIX_ONLY(rundown_status |=) gds_rundown();
+			rundown_status |= gds_rundown(CLEANUP_UDI_FALSE);
 			gd_ht_kill(region->reg_hash, TRUE);	/* TRUE to free up the table and the gv_targets it holds too */
 			FREE_CSA_DIR_TREE(cs_addrs);
 			cm_del_gdr_ptr(gv_cur_region);
@@ -117,7 +116,6 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 		ptr = ptr->next;
 		free(last);
 	}
-
 	if (EXIT_NRM != rundown_status)
-		rts_error(VARLSTCNT(1) ERR_NOTALLDBRNDWN);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBRNDWN);
 }

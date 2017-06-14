@@ -27,7 +27,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V6.3-000A)
+set(version V6.3-001A)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -551,22 +551,9 @@ if(GTM_ENABLE_ENCRYPTION)
   install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
 endif()
 
+<<<<<<< HEAD
 # Library=OPENSSL Algorithm=BLOWFISHCFB
 if(GTM_ENABLE_ENCRYPTION)
-  add_library(libgtmcrypt_openssl_BLOWFISHCFB MODULE ${libgtmcrypt_SOURCES})
-  set_target_properties(libgtmcrypt_openssl_BLOWFISHCFB PROPERTIES
-  OUTPUT_NAME gtmcrypt_openssl_BLOWFISHCFB
-  COMPILE_DEFINITIONS "USE_OPENSSL -DUSE_BLOWFISHCFB"
-  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
-  )
-  target_link_libraries(libgtmcrypt_openssl_BLOWFISHCFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
-  add_dependencies(libgtmcrypt_openssl_BLOWFISHCFB gen_gtm_threadgbl_deftypes)
-  if(CYGWIN) # VEN/SMH: Cygwin needs import libraries to resolve all symbols. Windows thing.
-      add_dependencies(libgtmcrypt_openssl_BLOWFISHCFB libgtmshr)
-      target_link_libraries(libgtmcrypt_openssl_BLOWFISHCFB libgtmshr)
-  endif()
-  install(TARGETS libgtmcrypt_openssl_BLOWFISHCFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
-
   add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
   set_target_properties(libgtmtls PROPERTIES
   OUTPUT_NAME gtmtls
@@ -930,7 +917,11 @@ install(FILES sr_unix/lowerc_cp.sh DESTINATION ${GTM_INSTALL_DIR}
   RENAME lowerc_cp
   )
 
-install(FILES COPYING DESTINATION ${GTM_INSTALL_DIR})
+install(FILES sr_unix/gtmgblstat.xc DESTINATION ${GTM_INSTALL_DIR})
+
+if (EXISTS ${GTM_SOURCE_DIR}/COPYING)
+  install(FILES COPYING DESTINATION ${GTM_INSTALL_DIR})
+endif()
 
 add_custom_target(place_files ALL DEPENDS ${files_to_place})
 

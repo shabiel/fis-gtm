@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,10 +89,10 @@ GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	jnl_process_vector	*prc_vec;
 
 ZOS_ONLY(error_def(ERR_BADTAG);)
+error_def(ERR_FILENAMETOOLONG);
 error_def(ERR_FILERENAME);
 error_def(ERR_JNLCRESTATUS);
 error_def(ERR_JNLFNF);
-error_def(ERR_PERMGENFAIL);
 error_def(ERR_PREMATEOF);
 error_def(ERR_RENAMEFAIL);
 error_def(ERR_TEXT);
@@ -105,13 +105,14 @@ uint4	cre_jnl_file(jnl_create_info *info)
 {
 	mstr 		filestr;
 	int 		org_fn_len, rename_fn_len, fstat;
-	char		*org_fn, rename_fn[MAX_FN_LEN];
+	char		*org_fn, rename_fn[MAX_FN_LEN + 1];
 	boolean_t	no_rename;
 
 	assert(0 != jgbl.gbl_jrec_time);
 	if (!info->no_rename)	/* ***MAYBE*** rename is required */
 	{
 		no_rename = FALSE;
+		rename_fn_len = ARRAYSIZE(rename_fn);
 		if (SS_NORMAL != (info->status = prepare_unique_name((char *)info->jnl, info->jnl_len, "", "",
 				rename_fn, &rename_fn_len, jgbl.gbl_jrec_time, &info->status2)))
 		{
@@ -144,6 +145,11 @@ uint4	cre_jnl_file(jnl_create_info *info)
 		if (no_rename)
 		{
 			STATUS_MSG(info);
+			if (ERR_FILENAMETOOLONG == info->status)
+				return EXIT_ERR;
+			/* Else it is an error from "gtm_file_stat" (invoked from "prepare_unique_name" above).
+			 * It usually means the rename we originally wanted is no longer required. So continue.
+			 */
 			info->status = info->status2 = SS_NORMAL;
 			info->no_rename = TRUE; /* We wanted to rename, but not required anymore */
 			info->no_prev_link = TRUE;	/* No rename => no prev_link */
@@ -161,7 +167,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	struct_jrec_pini	*pini_record;
 	struct_jrec_epoch	*epoch_record;
 	struct_jrec_eof		*eof_record;
-	unsigned char		*create_fn, fn_buff[MAX_FN_LEN];
+	unsigned char		*create_fn, fn_buff[MAX_FN_LEN + STR_LIT_LEN(EXT_NEW) + 1];
 	int			create_fn_len, cre_jnl_rec_size, status, write_size, jrecbufbase_size;
 	fd_type			channel;
 	char            	*jrecbuf, *jrecbuf_base;
@@ -174,6 +180,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	int			group_id;
 	struct stat		sb;
 	int			perm;
+	struct perm_diag_data	pdd;
 	int			idx;
 	trans_num		db_tn;
 	uint4			temp_offset, temp_checksum, pfin_offset, eof_offset;
@@ -199,6 +206,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		if (NULL != csa)
 			cre_jnl_file_intrpt_rename(csa);	/* deal with *_new.mjl files */
 		create_fn = &fn_buff[0];
+		create_fn_len = ARRAYSIZE(fn_buff);
 		if (SS_NORMAL != (info->status = prepare_unique_name((char *)info->jnl, (int)info->jnl_len, "", EXT_NEW,
 								     (char *)create_fn, &create_fn_len, 0, &info->status2)))
 		{
@@ -235,7 +243,22 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		return EXIT_ERR;
 	}
 	/* Setup new group and permissions if indicated by the security rules */
-	gtm_permissions(&sb, &user_id, &group_id, &perm, PERM_FILE);
+	if (!gtm_permissions(&sb, &user_id, &group_id, &perm, PERM_FILE, &pdd))
+	{
+		send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+			ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
+			PERMGENDIAG_ARGS(pdd));
+		if (IS_GTM_IMAGE)
+			rts_error_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
+				PERMGENDIAG_ARGS(pdd));
+		else
+			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
+				PERMGENDIAG_ARGS(pdd));
+		F_CLOSE(channel, status);
+		return EXIT_ERR;
+	}
 	/* if group not the same then change group of temporary file */
 	if ((((INVALID_UID != user_id) && (user_id != stat_buf.st_uid))
 			|| ((INVALID_GID != group_id) && (group_id != stat_buf.st_gid)))
@@ -302,46 +325,36 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	temp_offset = JNL_HDR_LEN;
 	ADJUST_CHECKSUM(temp_checksum, temp_offset, temp_checksum);
 	ADJUST_CHECKSUM(temp_checksum, info->checksum, pini_record->prefix.checksum);
-	/* EPOCHs are written unconditionally in Unix */
-	if (JNL_HAS_EPOCH(info))
-	{
-		epoch_record = (struct_jrec_epoch *)&jrecbuf[PINI_RECLEN];
-		epoch_record->prefix.jrec_type = JRT_EPOCH;
-		epoch_record->prefix.forwptr = epoch_record->suffix.backptr = EPOCH_RECLEN;
-		epoch_record->prefix.tn = db_tn;
-		epoch_record->prefix.pini_addr = JNL_HDR_LEN;
-		epoch_record->prefix.time = jgbl.gbl_jrec_time;
-		epoch_record->blks_to_upgrd = info->blks_to_upgrd;
-		epoch_record->free_blocks   = info->free_blocks;
-		epoch_record->total_blks    = info->total_blks;
-		epoch_record->fully_upgraded = info->csd->fully_upgraded;
-		epoch_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-		epoch_record->jnl_seqno = info->reg_seqno;
-		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
-			epoch_record->strm_seqno[idx] = info->csd->strm_reg_seqno[idx];
-		if (jgbl.forw_phase_recovery)
-		{	/* If MUPIP JOURNAL -ROLLBACK, might need some adjustment. See macro definition for comments */
-			MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(info->csd, epoch_record->strm_seqno);
-		}
-		epoch_record->filler = 0;
-		epoch_record->prefix.checksum = INIT_CHECKSUM_SEED;
-		temp_checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)epoch_record, SIZEOF(struct_jrec_epoch));
-		temp_offset = JNL_HDR_LEN + PINI_RECLEN;
-		ADJUST_CHECKSUM(temp_checksum, temp_offset, temp_checksum);
-		ADJUST_CHECKSUM(temp_checksum, info->checksum, epoch_record->prefix.checksum);
-		pfin_record = (struct_jrec_pfin *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN];
-		pfin_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN;
-		eof_record = (struct_jrec_eof *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN];
-		eof_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN;
-		cre_jnl_rec_size = PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN;
-	} else
-	{
-		pfin_record = (struct_jrec_pfin *)&jrecbuf[PINI_RECLEN];
-		pfin_offset = JNL_HDR_LEN + PINI_RECLEN;
-		eof_record = (struct_jrec_eof *)&jrecbuf[PINI_RECLEN + PFIN_RECLEN];
-		eof_offset = JNL_HDR_LEN + PINI_RECLEN + PFIN_RECLEN;
-		cre_jnl_rec_size = PINI_RECLEN + PFIN_RECLEN + EOF_RECLEN;
+	/* EPOCHs are written unconditionally even for NOBEFORE_IMAGE journaling */
+	epoch_record = (struct_jrec_epoch *)&jrecbuf[PINI_RECLEN];
+	epoch_record->prefix.jrec_type = JRT_EPOCH;
+	epoch_record->prefix.forwptr = epoch_record->suffix.backptr = EPOCH_RECLEN;
+	epoch_record->prefix.tn = db_tn;
+	epoch_record->prefix.pini_addr = JNL_HDR_LEN;
+	epoch_record->prefix.time = jgbl.gbl_jrec_time;
+	epoch_record->blks_to_upgrd = info->blks_to_upgrd;
+	epoch_record->free_blocks   = info->free_blocks;
+	epoch_record->total_blks    = info->total_blks;
+	epoch_record->fully_upgraded = info->csd->fully_upgraded;
+	epoch_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+	epoch_record->jnl_seqno = info->reg_seqno;
+	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		epoch_record->strm_seqno[idx] = info->csd->strm_reg_seqno[idx];
+	if (jgbl.forw_phase_recovery)
+	{	/* If MUPIP JOURNAL -ROLLBACK, might need some adjustment. See macro definition for comments */
+		MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(info->csd, epoch_record->strm_seqno);
 	}
+	epoch_record->filler = 0;
+	epoch_record->prefix.checksum = INIT_CHECKSUM_SEED;
+	temp_checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)epoch_record, SIZEOF(struct_jrec_epoch));
+	temp_offset = JNL_HDR_LEN + PINI_RECLEN;
+	ADJUST_CHECKSUM(temp_checksum, temp_offset, temp_checksum);
+	ADJUST_CHECKSUM(temp_checksum, info->checksum, epoch_record->prefix.checksum);
+	pfin_record = (struct_jrec_pfin *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN];
+	pfin_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN;
+	eof_record = (struct_jrec_eof *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN];
+	eof_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN;
+	cre_jnl_rec_size = PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN;
 	pfin_record->prefix.jrec_type = JRT_PFIN;
 	pfin_record->prefix.forwptr = pfin_record->suffix.backptr = PFIN_RECLEN;
 	pfin_record->prefix.tn = db_tn;
@@ -384,7 +397,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	JNL_DO_FILE_WRITE(csa, create_fn, channel, JNL_HDR_LEN, jrecbuf, write_size, info->status, info->status2);
 	STATUS_MSG(info);
 	RETURN_ON_ERROR(info);
-	UNIX_ONLY(GTM_JNL_FSYNC(csa, channel, status);)
+	GTM_JNL_FSYNC(csa, channel, status);
 	F_CLOSE(channel, status);	/* resets "channel" to FD_INVALID */
 	/* Now that EOF record has been written, keep csa->jnl->jnl_buff->prev_jrec_time up to date.
 	 * One exception is if journaling is not yet turned on but is being turned on by the current caller.
@@ -443,13 +456,13 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	else
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len,
 				rename_fn);
-#		ifdef DEBUG
-		if (gtm_white_box_test_case_enabled && (WBTEST_JNL_CREATE_INTERRUPT == gtm_white_box_test_case_number))
-		{
-			UNIX_ONLY(DBGFPF((stderr, "CRE_JNL_FILE: started a wait\n")));	/* this white-box test is for UNIX */
-			LONG_SLEEP(600);
-			assert(FALSE); /* Should be killed before that */
-		}
-#		endif
+#	ifdef DEBUG
+	if (gtm_white_box_test_case_enabled && (WBTEST_JNL_CREATE_INTERRUPT == gtm_white_box_test_case_number))
+	{
+		DBGFPF((stderr, "CRE_JNL_FILE: started a wait\n"));
+		LONG_SLEEP(600);
+		assert(FALSE); /* Should be killed before that */
+	}
+#	endif
 	return EXIT_NRM;
 }

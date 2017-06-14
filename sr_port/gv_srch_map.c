@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,18 +15,23 @@
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "gvcst_protos.h"	/* needed by OPEN_BASEREG_IF_STATSREG */
 
 /* Searches a global directory map array for which map entry an input "key" falls in.
  * "key" could be an unsubscripted or subscripted global reference.
+ * "skip_basedb_open" is set to TRUE in a special case from a call in "gvcst_init_statsDB" and is FALSE otherwise.
+ *	In that special case, the caller knows to set the ^%YGS map entry to point to the appropriate statsdb region
+ *	so we do not need to do unnecessary opens of other basedb regions. But otherwise this function ensures that
+ *	if ever a map entry is returned that points to a statsdb region, the corresponding basedb region has been opened.
  */
-gd_binding *gv_srch_map(gd_addr *addr, char *key, int key_len)
+gd_binding *gv_srch_map(gd_addr *addr, char *key, int key_len, boolean_t skip_basedb_open)
 {
 	int		res;
 	int		low, high, mid;
 	gd_binding	*map_start, *map;
-	DEBUG_ONLY(
-		int	dbg_match;
-	)
+#	ifdef DEBUG
+	int		dbg_match;
+#	endif
 
 	map_start = addr->maps;
 	assert(('%' == map_start[1].gvkey.addr[0]) && (1 == map_start[1].gvname_len));
@@ -42,7 +48,10 @@ gd_binding *gv_srch_map(gd_addr *addr, char *key, int key_len)
 		if (low == high)
 		{
 			assert((-1 == dbg_match) || (low == dbg_match));
-			return &map_start[low];
+			map = &map_start[low];
+			if (!skip_basedb_open)
+				OPEN_BASEREG_IF_STATSREG(map);	/* can modify map->reg.addr if statsDBReg */
+			return map;
 		}
 		assert(low < high);
 		mid = (low + high) / 2;
@@ -60,8 +69,14 @@ gd_binding *gv_srch_map(gd_addr *addr, char *key, int key_len)
 		{
 			assert(key_len == (map->gvkey_len - 1));
 			low = mid + 1;
-			DEBUG_ONLY(dbg_match = low;)
-			PRO_ONLY(return &map_start[low];)
+#			ifdef DEBUG
+			dbg_match = low;
+#			else
+			map = &map_start[low];
+			if (!skip_basedb_open)
+				OPEN_BASEREG_IF_STATSREG(map);	/* can modify map->reg.addr if statsDBReg */
+			return map;
+#			endif
 		}
 	} while (TRUE);
 }
@@ -87,6 +102,14 @@ gd_binding *gv_srch_map_linear(gd_binding *start_map, char *key, int key_len)
 	)
 	for ( ; ; map++)
 	{
+		/* Currently, the only callers of this function are gvcst_spr_* functions (e.g. "gvcst_spr_data" etc.).
+		 * And most of them (except gvcst_spr_query/gvcst_start_queryget) start an implicit TP transaction right
+		 * after this call. And since statsDB init is deferred once in TP, it is preferable to do the init before
+		 * the TP begins. So we include the OPEN_BASEREG_IF_STATSREG macro call here instead of in each of the
+		 * caller. This can be moved back to the individual callers if new callers of this function happen which
+		 * don't need this macro.
+		 */
+		OPEN_BASEREG_IF_STATSREG(map);	/* can modify map->reg.addr if statsDBReg */
 		assert(map < &addr->maps[addr->n_maps]);
 		res = memcmp(key, &map->gvkey.addr[0], key_len);
 		if (0 < res)
@@ -100,6 +123,7 @@ gd_binding *gv_srch_map_linear(gd_binding *start_map, char *key, int key_len)
 		map++;
 		break;
 	}
+	OPEN_BASEREG_IF_STATSREG(map);	/* can modify map->reg.addr if statsDBReg */
 	return map;
 }
 
@@ -121,6 +145,13 @@ gd_binding *gv_srch_map_linear_backward(gd_binding *start_map, char *key, int ke
 	)
 	for ( ; ; map--)
 	{
+		/* Currently, the only caller of this function is "gvcst_spr_zprevious". And it starts an implicit TP transaction
+		 * right after this call. And since statsDB init is deferred once in TP, it is preferable to do the init before
+		 * the TP begins. So we include the OPEN_BASEREG_IF_STATSREG macro call here instead of in each of the
+		 * caller. This can be moved back to the individual callers if new callers of this function happen which
+		 * don't need this macro.
+		 */
+		OPEN_BASEREG_IF_STATSREG(map);	/* can modify map->reg.addr if statsDBReg */
 		assert(map >= addr->maps);
 		res = memcmp(key, &map->gvkey.addr[0], key_len);
 		if (0 < res)
@@ -135,5 +166,6 @@ gd_binding *gv_srch_map_linear_backward(gd_binding *start_map, char *key, int ke
 	}
 	map++;
 	assert(map > addr->maps);
+	OPEN_BASEREG_IF_STATSREG(map);	/* can modify map->reg.addr if statsDBReg */
 	return map;
 }
