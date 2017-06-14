@@ -879,6 +879,8 @@ install(FILES sr_unix/lowerc_cp.sh DESTINATION ${GTM_INSTALL_DIR}
   RENAME lowerc_cp
   )
 
+install(FILES sr_unix/gtmgblstat.xc DESTINATION ${GTM_INSTALL_DIR})
+
 if (EXISTS ${GTM_SOURCE_DIR}/COPYING)
   install(FILES COPYING DESTINATION ${GTM_INSTALL_DIR})
 endif()
