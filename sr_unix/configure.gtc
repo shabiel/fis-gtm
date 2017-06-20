@@ -724,7 +724,7 @@ chmod 700 $tgtmsecshrdir
 chgrp $bingroup $tgtmsecshrdir
 
 # Install gtmsecshr and the wrapper with special permissions
-if [ $arch = "linux" ]; then
+if [ $arch = "linux" -a $OS != "Windows_NT" ]; then
 	install -m 4555 -o root -g $bingroup gtmsecshr $gtmdist
 	install -m 4500 -o root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
 elif [ $OS = "Windows_NT" ]; then
