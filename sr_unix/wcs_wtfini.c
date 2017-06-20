@@ -228,7 +228,9 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 #		endif
 		assert(csr->dirty);
 		assert(CR_BLKEMPTY != csr->blk);
+#       ifndef __CYGWIN__
 		AIO_SHIM_ERROR(&(csr->aiocb), aio_errno);
+#       endif
 		assert(EBADF != aio_errno);
 		if ((ENOSYS == aio_errno) || (EINVAL == aio_errno))
 		{
@@ -288,7 +290,9 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			 *	case of the corresponding synchronous "write()" call.
 			 */
 			assert(EINTR != aio_errno);
+#           ifndef __CYGWIN__
 			AIO_SHIM_RETURN(&(csr->aiocb), aio_retval); /* get the return value of the i/o */
+#           endif
 #			ifdef DEBUG
 			/* Fake an error once in a while. But do not do that in AIX if we are inside "wcs_flu" as we
 			 * have seen a lot of test failures because "wcs_flu" takes more than 1 minute to reflush

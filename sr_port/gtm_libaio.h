@@ -20,9 +20,13 @@
 #endif
 
 #ifndef USE_LIBAIO
-#include <aio.h>
+#ifndef __CYGWIN__
+#include <aio.h> 
+#endif /* /CYGWIN */
 #define IF_LIBAIO(x) /* NONE */
 #define IF_LIBAIO_ELSE(x, y) y
+struct aiocb {
+};
 #else	/* USE_LIBAIO */
 
 #ifndef _GNU_SOURCE
