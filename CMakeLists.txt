@@ -551,8 +551,6 @@ if(GTM_ENABLE_ENCRYPTION)
   install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
 endif()
 
-<<<<<<< HEAD
-# Library=OPENSSL Algorithm=BLOWFISHCFB
 if(GTM_ENABLE_ENCRYPTION)
   add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
   set_target_properties(libgtmtls PROPERTIES
