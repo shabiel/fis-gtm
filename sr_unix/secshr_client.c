@@ -215,7 +215,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 					LEN_AND_LIT("stat"), CALLFROM, errno);
 #ifdef __CYGWIN__ /* OSE/SMH - Fixed this for Cygwin - Cygwin doesn't have root, but has an Admin group*/
 		if ((ROOTGID != stat_buf.st_gid)
-			|| !(stat_buf.st_mode & S_ISUID)
+			|| !(stat_buf.st_mode & S_ISGID)
 			|| (0 != ACCESS(gtmsecshr_pathname.addr, (X_OK))))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
 #else /* OSE/SMH - All other unices */
