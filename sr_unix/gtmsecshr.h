@@ -13,7 +13,7 @@
 #define _GTMSECSHR
 
 /* To enable debugging of gtmsecshr, uncomment #define immediately below */
-/* #define DEBUG_GTMSECSHR */
+#define DEBUG_GTMSECSHR /* sam */
 #ifdef DEBUG_GTMSECSHR
 # define LOGFLAGS (LOG_USER | LOG_INFO)
 # define DBGGSSHR(x) syslog x
@@ -59,7 +59,11 @@
 #define GTMSECSHR_DIR_SUFFIX		"/gtmsecshrdir"
 #define GTMSECSHR_EXECUTABLE		"gtmsecshr"
 
+#ifdef __CYGWIN__ /* Cygwin does not have a root user */
+#define	ROOTGID				544
+#else
 #define	ROOTUID				0
+#endif
 
 #ifdef SHORT_GTMSECSHR_TIMEOUT
 #    define MAX_TIMEOUT_VALUE		30
