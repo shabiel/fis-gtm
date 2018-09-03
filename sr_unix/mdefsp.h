@@ -116,7 +116,7 @@ typedef unsigned short	in_port_t;
 #ifdef UNICODE_SUPPORTED_OBEYED
 #undef UNICODE_SUPPORTED
 #endif
-#define MUTEX_MSEM_WAKE
+/*#define MUTEX_MSEM_WAKE */ /* ose/smh - problem with cygwin */
 #define POSIX_MSEM
 #define KEY_T_LONG			/* 8 bytes */
 #define SYS_ERRLIST_INCLUDE	<errno.h>

@@ -390,15 +390,20 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		gtmsecshr_exit(BADGTMDISTDIR, FALSE);
 	}
 	/*
-	 **** With invocation validated, begin our priviledge escalation ****
-	 */
+      **** With invocation validated, begin our priviledge escalation ****
+      */
+#ifdef __CYGWIN__ /* Cygwin has an admin group only, not a root user. gtmsecshr must be sgid not suid. */
+	if (-1 == setgid(ROOTGID))
+#else
 	if (-1 == setuid(ROOTUID))
+#endif
 	{
 		save_errno = errno;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRSUIDF, 0, ERR_GTMSECSHROPCMP, 0, save_errno);
 		gtmsecshr_exit(SETUIDROOT, FALSE);
 	}
+
 	/* Before we fork, close the system log because when the facility name disappears in this middle-process,
 	 * the logging capability disappears on some systems too - On others, it takes the executable name instead.
 	 * Either one causes our tests to fail.
@@ -523,8 +528,12 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	 */
 	STR_HASH((char *)gtm_release_name, gtm_release_name_len, TREF(gtmsecshr_comkey), 0);
 	/* Initialization complete */
+	/* ose/smh - this log message crashes on cygwin -- a segfault due to the va_args parser! */
+	/* Re-evaulate for future versions of GTM/YDB */
+#ifndef __CYGWIN__
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRDMNSTARTED, 5,
 		gtmsecshr_key, gtm_release_name_len, gtm_release_name, *rundir_len, *rundir);
+#endif
 	return;
 }
 

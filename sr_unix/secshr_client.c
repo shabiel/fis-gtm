@@ -213,10 +213,18 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("stat"), CALLFROM, errno);
+#ifdef __CYGWIN__ /* OSE/SMH - Fixed this for Cygwin - Cygwin doesn't have root, but has an Admin group*/
+		if ((ROOTGID != stat_buf.st_gid)
+			|| !(stat_buf.st_mode & S_ISGID)
+			|| (0 != ACCESS(gtmsecshr_pathname.addr, (X_OK))))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
+#else /* OSE/SMH - All other unices */
 		if ((ROOTUID != stat_buf.st_uid)
 			|| !(stat_buf.st_mode & S_ISUID)
 			|| (0 != ACCESS(gtmsecshr_pathname.addr, (X_OK))))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
+#endif
+
 		gtmsecshr_file_check_done = TRUE;
 	}
 	if (!gtmsecshr_sock_init_done && (0 < (init_ret_code = gtmsecshr_sock_init(CLIENT))))	/* Note assignment */

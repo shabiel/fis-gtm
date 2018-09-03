@@ -996,7 +996,11 @@ int gtm_init()
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("stat for $gtm_dist/gtmsecshr"), CALLFROM, errno);
 		/* Ensure that the call-in can execute $gtm_dist/gtmsecshr. This not sufficient for security purposes */
+#ifdef __CYGWIN__
+		if ((ROOTGID != stat_buf.st_gid) || !(stat_buf.st_mode & S_ISGID))
+#else
 		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
+#endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
 		else
 		{	/* $gtm_dist validated */

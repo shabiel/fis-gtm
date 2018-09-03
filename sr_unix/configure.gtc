@@ -677,8 +677,12 @@ export gtmroutines
 other_object_files=""
 csh_script_files=""
 
-# make database files read only
-chmod 0444 $gtmdist/*.dat
+# make database files read only (except on Cygwin, as gtmsecshr wants to update these)
+if [ $OS = "Windows_NT" ]; then
+	chmod 0666 $gtmdist/*.dat
+else
+	chmod 0444 $gtmdist/*.dat
+fi
 chmod 0444 $gtmdist/*.gld
 
 # $other_object_files, $csh_script_files should be removed unconditionally
@@ -720,16 +724,20 @@ fi
 # Install real gtmsecshr with special permissions in $gtmdist/gtmsecshrdir
 tgtmsecshrdir=$gtmdist/gtmsecshrdir
 mkdir $tgtmsecshrdir
-chmod 700 $tgtmsecshrdir
+if [ $OS = "Windows_NT" ]; then # Perms wide open so anybody can cd into the directory
+	chmod 777 $tgtmsecshrdir
+else
+	chmod 700 $tgtmsecshrdir
+fi
 chgrp $bingroup $tgtmsecshrdir
 
 # Install gtmsecshr and the wrapper with special permissions
 if [ $arch = "linux" -a $OS != "Windows_NT" ]; then
 	install -m 4555 -o root -g $bingroup gtmsecshr $gtmdist
 	install -m 4500 -o root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
-elif [ $OS = "Windows_NT" ]; then
-	install -m 6555 -o $owner -g $bingroup gtmsecshr.exe $gtmdist
-	install -m 6500 -o $owner -g $bingroup gtmsecshrdir/gtmsecshr.exe $tgtmsecshrdir/gtmsecshr.exe
+elif [ $OS = "Windows_NT" ]; then # sgid for Cygwin
+	install -m 2555 -o $owner -g $bingroup gtmsecshr.exe $gtmdist
+	install -m 2555 -o $owner -g $bingroup gtmsecshrdir/gtmsecshr.exe $tgtmsecshrdir/gtmsecshr.exe
 elif [ $arch = "ibm" ]; then
 	/usr/bin/install -f $gtmdist -M 4555 -O root -G $bingroup gtmsecshr
 	/usr/bin/install -f $tgtmsecshrdir -M 4500 -O root -G $bingroup gtmsecshrdir/gtmsecshr
@@ -787,8 +795,16 @@ fi
 chmod a-w $gtmdist
 chmod a-w $gtmdist/*
 
+# make database files read/write (except on Cygwin, as gtmsecshr wants to update these)
+if [ $OS = "Windows_NT" ]; then
+	chmod 0666 $gtmdist/*.dat
+fi
+
 if [ -d $gtmdist/utf8 ]; then
 	chmod a-w $gtmdist/utf8/*
+	if [ $OS = "Windows_NT" ]; then
+		chmod 0666 $gtmdist/utf8/*.dat
+	fi
 fi
 
 if [ -d $gtmdist/plugin ]; then

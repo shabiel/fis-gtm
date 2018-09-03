@@ -52,7 +52,11 @@
 #include "gtm_limits.h"
 
 #define ROOTUID 0
+#ifdef __CYGWIN__
+#define ROOTGID 544
+#else
 #define ROOTGID 0
+#endif
 #define MAX_ENV_VAR_VAL_LEN 1024
 #define MAX_ALLOWABLE_LEN 256
 #define ASCIICTLMAX	32  /* space character */
@@ -341,8 +345,9 @@ int main()
 	}
 	if (!ret)
 	{	/* clear all */
-#		if defined(SUNOS) || defined (__CYGWIN__)
-		environ = NULL;
+#		if defined(SUNOS) || defined (__CYGWIN__) /* Fixed by OSE/SMH - environ = NULL causes failures later*/
+		char *clearenv = NULL;
+		environ = &clearenv;
           	status = 0;
 #		else
 		status = clearenv();
@@ -392,26 +397,43 @@ int main()
 		}
 #		endif
 	}
+	/* OSE/SMH - WARNING - The if statements dont' have braces! Be careful to make sure that you only have one statement per ; */
 	if (!ret)
 	{	/* go to root */
 		if (-1 == CHDIR(gtm_secshrdir_path))
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRCHDIRFAILED1, gtm_secshrdir_path_display, errno);
 		else if (-1 == Stat(REL_PATH_TO_CURDIR, &gtm_secshrdir_stat))
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSTATFAILED, gtm_secshrdir_path_display, errno);
+#ifdef __CYGWIN__
+		else if (ROOTGID != gtm_secshrdir_stat.st_gid)
+#else
 		else if (ROOTUID != gtm_secshrdir_stat.st_uid)
+#endif
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOTOWNEDBYROOT, gtm_secshrdir_path_display);
+#ifndef __CYGWIN__ /* Skip this for now - We are not going to configure the perms this way */
 		else if (gtm_secshrdir_stat.st_mode & 0277)
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRPERMINCRCT, gtm_secshrdir_path_display,
 					gtm_secshrdir_stat.st_mode & 0777);
+#endif
 		else if (-1 == Stat(REL_PATH_TO_GTMSECSHR, &gtm_secshr_stat))
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSTATFAILED, gtm_secshr_path_display, errno);
+#ifdef __CYGWIN__
+		else if (ROOTGID != gtm_secshr_stat.st_gid)
+#else
 		else if (ROOTUID != gtm_secshr_stat.st_uid)
+#endif
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOTOWNEDBYROOT, gtm_secshr_path_display);
+#ifndef __CYGWIN__ /* Skip this for now - We are not going to configure the perms this way */
 		else if (gtm_secshr_stat.st_mode & 022)
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRWRITABLE, gtm_secshr_path_display);
 		else if (!(gtm_secshr_stat.st_mode & 04000))
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOTSETUID, gtm_secshr_path_display);
+#endif
+#ifdef __CYGWIN__
+		else if (-1 == setgid(ROOTGID))
+#else
 		else if (-1 == setuid(ROOTUID))
+#endif
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSETUIDFAILED);
 		else
 		{	/* call the real gtmsecshr, but have ps display the original gtmsecshr location */

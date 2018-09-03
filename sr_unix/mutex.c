@@ -878,8 +878,10 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 						yields += sleep_spin_cnt;	/* start with max */
 					}
 #					ifndef MUTEX_MSEM_WAKE
+					/* ose/smh - This doesn't seem to belong here!
 					if (wake_this_pid != process_id)
 						mutex_wake_proc((sm_int_ptr_t)&wake_this_pid, wake_instance);
+				        */
 #					endif
 					if (0 != (--sleep_spin_cnt))
 						return (cdb_sc_dbccerr);	/* Too many failures */
