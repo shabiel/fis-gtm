@@ -77,7 +77,7 @@ void op_wttab(mint col)
 		if (iod->wrap)
 		{
 			iod->dollar.x = col % iod->width;
-			assert(0 != iod->length || iod->dollar.y < iod->length);
+			/* assert(0 != iod->length || iod->dollar.y < iod->length); Fixed upstream!!! OSE/SMH */
 			iod->dollar.y += (col / iod->width);
 			if (iod->length)
 				iod->dollar.y %= iod->length;
