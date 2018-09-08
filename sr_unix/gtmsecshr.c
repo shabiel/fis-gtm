@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -214,7 +214,6 @@ int main(int argc, char_ptr_t argv[])
 	int			save_errno;
 	int			recv_complete, send_complete;
 	int			num_chars_recd, num_chars_sent, rundir_len;
-	int4			msec_timeout;			/* timeout in milliseconds */
 	TID			timer_id;
 	GTM_SOCKLEN_TYPE	client_addr_len;
 	char			*recv_ptr, *send_ptr, *rundir;
@@ -225,6 +224,7 @@ int main(int argc, char_ptr_t argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
+	assert(MAXPOSINT4 >= GTMSECSHR_MESG_TIMEOUT);
 	common_startup_init(GTMSECSHR_IMAGE); 	/* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
 	err_init(gtmsecshr_cond_hndlr);
 	gtmsecshr_init(argv, &rundir, &rundir_len);
@@ -249,9 +249,8 @@ int main(int argc, char_ptr_t argv[])
 		}
 		recv_ptr = (char *)&mesg;
 		client_addr_len = SIZEOF(struct sockaddr_un);
-		msec_timeout = timeout2msec(GTMSECSHR_MESG_TIMEOUT);
-		DBGGSSHR((LOGFLAGS, "gtmsecshr: Select rc = %d  message timeout = %d\n", selstat, msec_timeout));
-		start_timer(timer_id, msec_timeout, gtmsecshr_timer_handler, 0, NULL);
+		DBGGSSHR((LOGFLAGS, "gtmsecshr: Select rc = %d  message timeout = %d\n", selstat, GTMSECSHR_MESG_TIMEOUT));
+		start_timer(timer_id, GTMSECSHR_MESG_TIMEOUT, gtmsecshr_timer_handler, 0, NULL);
 		recv_complete = FALSE;
 		do
 		{	/* Note RECVFROM does not loop on EINTR return codes so must be handled */
@@ -274,8 +273,7 @@ int main(int argc, char_ptr_t argv[])
 		if (INVALID_COMMAND != mesg.code)
 		{	/* Reply if code not overridden to mean no acknowledgement required */
 			send_ptr = (char *)&mesg;
-			msec_timeout = timeout2msec(GTMSECSHR_MESG_TIMEOUT);
-			start_timer(timer_id, msec_timeout, gtmsecshr_timer_handler, 0, NULL);
+			start_timer(timer_id, GTMSECSHR_MESG_TIMEOUT, gtmsecshr_timer_handler, 0, NULL);
 			send_complete = FALSE;
 			do
 			{
@@ -453,13 +451,14 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	if (-1 == CHDIR(P_tmpdir))	/* Switch to temporary directory as CWD */
 	{
 		save_errno = errno;
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3,
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_SEVERE(ERR_GTMSECSHRSTART), 3,
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRCHDIRF, 2, LEN_AND_STR(P_tmpdir), save_errno);
 		EXIT(UNABLETOCHDIR);
 	}
 	umask(0);
 	if (0 != gtmsecshr_pathname_init(SERVER, *rundir, *rundir_len))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Server path"), process_id);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server path"),
+			process_id);
 	if (-1 == (secshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_NOWAIT)))
 	{
 		secshr_sem = INVALID_SEMID;
@@ -480,7 +479,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	SEMOP(secshr_sem, sop, 2, semop_res, NO_WAIT);
 	if (0 > semop_res)
 	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_SEVERE(ERR_GTMSECSHRSTART), 3,
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("server already running"), errno);
 		/* If gtm_tmp is not defined, show default path */
@@ -492,7 +491,8 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		gtmsecshr_exit(SEMAPHORETAKEN, FALSE);
 	}
 	if (0 != gtmsecshr_sock_init(SERVER))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Server"), process_id);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server"),
+			process_id);
 	if (-1 == Stat(gtmsecshr_sock_name.sun_path, &stat_buf))
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
@@ -1028,7 +1028,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 	FCLOSE(procstrm, clrv);
 	if (-1 == clrv)
 		/* Not a functional issue so just warn about it in op-log */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_SYSCALL), 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
 	lnln = STRLEN(cmdbuf);
 	/* Look from the end backwards to find the last '/' to isolate the directory */
 	for (cptr = cmdbuf + lnln - 1; (cptr >= cmdbuf) && ('/' != *cptr); cptr--)
@@ -1062,7 +1062,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 	FCLOSE(procstrm, clrv);
 	if (-1 == clrv)
 		/* Not a functional issue so just warn about it in op-log */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_SYSCALL), 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
 #	endif
 	return 0;
 }

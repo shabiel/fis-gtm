@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2016 Fidelity National Information		#
+# Copyright (c) 2012-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -27,7 +27,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V6.3-001A)
+set(version V6.3-005)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -35,6 +35,10 @@ endif()
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+if(GTM_RELEASE_NAME)
+  add_definitions(-DGTM_RELEASE_NAME="${GTM_RELEASE_NAME}")
 endif()
 
 # Enable GT.M debug options unless directed not to enable them. Added to build without whitebox tests.
@@ -648,6 +652,7 @@ set(m_files_sr_port
   gdeexit.m
   gdehelp.m
   gdeinit.m
+  gdeinitsz.m
   gdelocks.m
   gdelog.m
   gdemap.m
@@ -724,6 +729,7 @@ foreach(f
   gtm_stdlib.h
   gtm_string.h
   gtm_strings.h
+  gtmgblstat.xc
   gtmxc_types.h
   main_pragma.h
   arch.gtc
@@ -743,6 +749,13 @@ foreach(f
   custom_errors_sample.txt
   )
   select_file(src ${f})
+  get_filename_component(srcfname "${src}" NAME)
+  add_custom_command(
+    OUTPUT "${GTM_BINARY_DIR}/${srcfname}"
+    DEPENDS "${src}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${src}" "${GTM_BINARY_DIR}/${srcfname}"
+    )
+  list(APPEND files_to_place "${GTM_BINARY_DIR}/${srcfname}")
   list(APPEND files ${src})
 endforeach()
 install(FILES ${files} DESTINATION ${GTM_INSTALL_DIR})
@@ -839,7 +852,7 @@ set(lke_hlp lke.hlp)
 foreach(help gtm gde mupip dse lke)
   set(CMAKE_CONFIGURABLE_FILE_CONTENT
     "Change -segment DEFAULT -block=2048 -file=\$gtm_dist/${help}help.dat
-Change -region DEFAULT -record=1020 -key=255
+Change -region DEFAULT -record=1020 -key=255 -qdbrundown -nostats
 exit")
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
                  ${GTM_BINARY_DIR}/${help}help.in1)
@@ -880,7 +893,7 @@ endforeach()
 if (GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
 add_custom_command(
   OUTPUT GTMDEFINEDTYPESTODB.o
-  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m
+  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${GTM_BINARY_DIR}/gtmhelp.dat_noro
   COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${GTM_BINARY_DIR}/GTMDefinedTypesInit.m
   COMMAND ${CMAKE_COMMAND}
     -D gtm_dist=${GTM_BINARY_DIR}
@@ -893,6 +906,56 @@ add_custom_command(
   )
 list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
 endif(GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
+
+foreach(help gtm gde mupip dse lke)
+  set(CMAKE_CONFIGURABLE_FILE_CONTENT
+	  "SET -ACC=MM -READ_ONLY -reg \"*\"
+exit")
+  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
+                 ${GTM_BINARY_DIR}/${help}help.in3)
+  set(env
+    -D gtm_dist=${GTM_BINARY_DIR}
+    -D gtmroutines=.
+    -D gtmgbldir=${GTM_BINARY_DIR}/${help}help
+    )
+  add_custom_command(
+    OUTPUT ${GTM_BINARY_DIR}/${help}help.dat_ro
+    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
+            ${GTM_BINARY_DIR}/${help}help.in3
+	    ${help}help.dat ${help}help.gld ${help}help.dat_noro
+    COMMAND ${CMAKE_COMMAND} ${env}
+      -D mumps=$<TARGET_FILE:mupip>
+      -D input_file=${GTM_BINARY_DIR}/${help}help.in3
+      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+    VERBATIM
+    )
+    list(APPEND targets_to_run ${GTM_BINARY_DIR}/${help}help.dat_ro)
+endforeach()
+
+foreach(help gtm gde mupip dse lke)
+  set(CMAKE_CONFIGURABLE_FILE_CONTENT
+	  "SET -ACC=MM -NOREAD_ONLY -reg \"*\"
+exit")
+  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
+                 ${GTM_BINARY_DIR}/${help}help.in4)
+  set(env
+    -D gtm_dist=${GTM_BINARY_DIR}
+    -D gtmroutines=.
+    -D gtmgbldir=${GTM_BINARY_DIR}/${help}help
+    )
+  add_custom_command(
+    OUTPUT ${GTM_BINARY_DIR}/${help}help.dat_noro
+    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
+            ${GTM_BINARY_DIR}/${help}help.in4
+	    ${help}help.dat ${help}help.gld
+    COMMAND ${CMAKE_COMMAND} ${env}
+      -D mumps=$<TARGET_FILE:mupip>
+      -D input_file=${GTM_BINARY_DIR}/${help}help.in4
+      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+    VERBATIM
+    )
+    list(APPEND targets_to_run ${GTM_BINARY_DIR}/${help}help.dat_noro)
+endforeach()
 #-----------------------------------------------------------------------------
 
 set(GTM_TOP "${GTM_BINARY_DIR}")
@@ -922,4 +985,4 @@ if (EXISTS ${GTM_SOURCE_DIR}/COPYING)
 endif()
 
 add_custom_target(place_files ALL DEPENDS ${files_to_place})
-
+add_custom_target(make_read_only ALL DEPENDS ${targets_to_run} place_files)

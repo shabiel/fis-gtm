@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,6 +33,7 @@
 #include "compiler.h"
 #include "min_max.h"
 #include "dm_setup.h"
+#include "restrict.h"
 #ifdef GTM_TRIGGER
 # include "gdsroot.h"			/* for gdsfhead.h */
 # include "gdsbt.h"			/* for gdsfhead.h */
@@ -55,6 +56,7 @@ error_def(ERR_INVZBREAK);
 error_def(ERR_MEMORY);
 error_def(ERR_NOPLACE);
 error_def(ERR_NOZBRK);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TRIGNAMENF);
 error_def(ERR_VMSMEMORY);
 error_def(ERR_ZBREAKFAIL);
@@ -81,6 +83,9 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 	boolean_t	deleted;
 	GTMTRIG_ONLY(boolean_t	is_trigger);
 
+	if (RESTRICTED(zbreak_op))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
+
 	MV_FORCE_STR(rtn);
 	MV_FORCE_STR(lab);
 	MV_FORCE_STR(act);
@@ -94,8 +99,12 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		zr_remove_zbrks(NULL, NOBREAKMSG);
 	else
 	{
-		GTMTRIG_ONLY(IS_TRIGGER_RTN(&rtn->str, is_trigger));
+#		ifdef GTM_TRIGGER
+		IS_TRIGGER_RTN(&rtn->str, is_trigger);
+		if (is_trigger && (RESTRICTED(trigger_mod)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
 		DBGIFTRIGR((stderr, "op_setzbrk: Setting/clearing a zbreak in a trigger\n"));
+#		endif
 		flush_pio();
 		if (WANT_CURRENT_RTN(rtn))
 			routine = CURRENT_RHEAD_ADR(frame_pointer->rvector);
@@ -127,7 +136,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		}
 		lab_name = NULL;
 		if (NULL == (line_offset_addr = find_line_addr(routine, &lab->str, offset, &lab_name)))
-			dec_err(VARLSTCNT(1) ERR_NOPLACE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPLACE);
 		else if (CANCEL_ONE == cnt)	/* Cancel ZBREAK */
 		{
 			addr = (zb_code *)LINE_NUMBER_ADDR(CURRENT_RHEAD_ADR(routine), line_offset_addr);
@@ -135,7 +144,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			if (NULL != (z_ptr = zr_find(&zbrk_recs, addr, RETURN_CLOSEST_MATCH_FALSE)))
 				zr_remove_zbreak(&zbrk_recs, z_ptr);
 			else
-				dec_err(VARLSTCNT(1) ERR_NOZBRK);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOZBRK);
 		} else if (0 <= cnt)		/* Set ZBREAK */
 		{
 #			ifdef ZB_AT_COMMENT_INFO

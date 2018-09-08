@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -111,7 +111,7 @@ GBLREF	int			reformat_buffer_len;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data		*cs_data;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			update_trans;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
@@ -158,6 +158,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	gd_region		*sav_cur_region;
 	sgmnt_addrs		*sav_cs_addrs;
 	sgmnt_data		*sav_cs_data;
+	jnlpool_addrs_ptr_t	sav_jnlpool;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_ERROR_POLICY_CSA */
 	intrpt_state_t		prev_intrpt_state;
 	char			*in, *out;
 	int			in_len;
@@ -166,7 +168,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	boolean_t		use_new_key, skip_in_trans, skip_sync, sync_keys;
 	que_ent_ptr_t		next, prev;
 	void_ptr_t              retcsrptr;
-	boolean_t		keep_buff_lock;
+	boolean_t		keep_buff_lock, pushed_region;
 	cache_rec_ptr_t		older_twin;
 
 	DCL_THREADGBL_ACCESS;
@@ -174,10 +176,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	SETUP_THREADGBL_ACCESS;
 	if (cr_list_ptr)
 		cr_list_ptr->numcrs = 0;
-	if (INST_FREEZE_ON_ERROR_POLICY)
-		PUSH_GV_CUR_REGION(region, sav_cur_region, sav_cs_addrs, sav_cs_data);
 	udi = FILE_INFO(region);
 	csa = &udi->s_addrs;
+	pushed_region = INST_FREEZE_ON_ERROR_POLICY_CSA(csa, local_jnlpool);
+	if (pushed_region)
+		PUSH_GV_CUR_REGION(region, sav_cur_region, sav_cs_addrs, sav_cs_data, sav_jnlpool);
 	csd = csa->hdr;
 	is_mm = (dba_mm == csd->acc_meth);
 	assert(is_mm || (dba_bg == csd->acc_meth));
@@ -188,8 +191,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	{
 		WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart1, 0, 0, 0, 0, 0);
 		BG_TRACE_PRO_ANY(csa, wrt_busy);
-		if (INST_FREEZE_ON_ERROR_POLICY)
-			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data);
+		if (pushed_region)
+			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data, sav_jnlpool);
 		return err_status;			/* Already here, get out */
 	}
 	/* Defer interrupts to protect against an inconsistent state caused by mismatch of such values as
@@ -204,8 +207,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 		WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart2, 0, 0, 0, 0, 0);
 		DECR_INTENT_WTSTART(cnl);
 		BG_TRACE_PRO_ANY(csa, wrt_blocked);
-		if (INST_FREEZE_ON_ERROR_POLICY)
-			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data);
+		if (pushed_region)
+			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data, sav_jnlpool);
 		ENABLE_INTERRUPTS(INTRPT_IN_WCS_WTSTART, prev_intrpt_state);
 		return err_status;
 	}
@@ -215,13 +218,13 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	 * Because it is highly unlikely for an interrupt-deferred process to get killed at exactly this spot, do not test that.
 	 */
 	INCR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);	/* and cnl->in_wtstart (shared copy) assignments as close as possible.   */
-	if (FROZEN_CHILLED(csd) && !FREEZE_LATCH_HELD(csa))
+	if (FROZEN_CHILLED(csa) && !FREEZE_LATCH_HELD(csa))
 	{
 		CAREFUL_DECR_CNT(cnl->in_wtstart, cnl->wc_var_lock);
 		DECR_INTENT_WTSTART(cnl);
 		csa->in_wtstart = FALSE;
-		if (INST_FREEZE_ON_ERROR_POLICY)
-			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data);
+		if (pushed_region)
+			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data, sav_jnlpool);
 		ENABLE_INTERRUPTS(INTRPT_IN_WCS_WTSTART, prev_intrpt_state);
 		/* Return non-zero in order to break wcs_wtstart_fini() out of its loop. Ignored elsewhere. */
 		return EAGAIN;
@@ -291,9 +294,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
                                                 {	/* Did not get the csr we intended so something must be wrong with cache.
 							 * Kill -9 can cause this. Assert that we were doing a crash shutdown.
 							 */
-                                                        assert(gtm_white_box_test_case_enabled
-                                                                && (WBTEST_CRASH_SHUTDOWN_EXPECTED
-                                                                == gtm_white_box_test_case_number));
+                                                        assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
+                                                                || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
                                                         SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
                                                         err_status = ERR_DBCCERR;
                                                         break;
@@ -336,7 +338,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 		}
 		if (NULL == csr)
 			break;				/* the queue is empty */
-		assert(!FROZEN_CHILLED(csd) || FREEZE_LATCH_HELD(csa));
+		assert(!FROZEN_CHILLED(csa) || FREEZE_LATCH_HELD(csa));
 		if (csr == csrfirst)
 		{					/* completed a tour of the queue */
 			queue_empty = FALSE;
@@ -446,13 +448,16 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 */
 			if (!wtfini_called_once && (was_crit || grab_crit_immediate(region, OK_FOR_WCS_RECOVER_FALSE)))
 			{
-				DEBUG_ONLY(dbg_wtfini_lcnt = dbg_wtfini_wcs_wtstart);	/* used by "wcs_wtfini" */
-				older_twin = (csr->bt_index ? (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, csr->twin) : cr);
-				assert(!older_twin->bt_index);
-				wcs_wtfini(region, CHECK_IS_PROC_ALIVE_FALSE, older_twin);
+				if (csr->twin)
+				{
+					DEBUG_ONLY(dbg_wtfini_lcnt = dbg_wtfini_wcs_wtstart);	/* used by "wcs_wtfini" */
+					older_twin = (csr->bt_index ? (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, csr->twin) : cr);
+					assert(!older_twin->bt_index);
+					wcs_wtfini(region, CHECK_IS_PROC_ALIVE_FALSE, older_twin);
+					wtfini_called_once = TRUE;
+				}
 				if (!was_crit)
 					rel_crit(region);
-				wtfini_called_once = TRUE;
 			}
 			/* Note that in the most common case, csr will be the NEWER twin. But it is possible csr is the OLDER
 			 * twin too. For example, if the OLDER twin's write got aborted because the process that initiated
@@ -506,8 +511,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 * check for bver == 0 and returns immediately in that case so it is okay to call it with a 0 bver in pro.
 			 */
 			assert(((blk_hdr_ptr_t)bp)->bver
-				|| (gtm_white_box_test_case_enabled
-					&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number)));
+				|| WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
 			if (IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver))
 			{	/* Need to downgrade/reformat this block back to a previous format. */
 				assert(!csd->asyncio);	/* asyncio & V4 format are not supported together */
@@ -536,7 +540,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				assert(IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver) || (GDSV6 == csr->ondsk_blkver));
 #			endif
 			if (csa->do_fullblockwrites)
-				size = ROUND_UP(size, csa->fullblockwrite_len);
+			{	/* See similiar logic in wcs_wtstart.c */
+				size = (int)ROUND_UP(size,
+						(FULL_DATABASE_WRITE == csa->do_fullblockwrites && csr->needs_first_write)
+						? csd->blk_size : csa->fullblockwrite_len);
+			}
 			assert(size <= csd->blk_size);
 			INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_write, 1);
 			save_bp = bp;
@@ -643,7 +651,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 * So we disable asyncio in the forward phase of offline/online rollback/recover.
 			 * This is easily identified currently by the global variable "multi_proc_in_use" being TRUE.
 			 */
+#			ifdef USE_NOAIO
+			do_asyncio = FALSE;
+#			else
 			do_asyncio = csd->asyncio && !multi_proc_in_use;
+#			endif
 			if (udi->fd_opened_with_o_direct)
 			{
 				size = ROUND_UP2(size, DIO_ALIGNSIZE(udi));
@@ -657,6 +669,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				if (!do_asyncio)
 				{
 					DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset, save_bp, size, save_errno);
+					csr->needs_first_write = FALSE;
 				} else
 				{
 					cr->wip_is_encr_buf = (save_bp != bp);
@@ -670,6 +683,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 							BG_TRACE_PRO_ANY(csa, wcs_wtstart_eagain_incrit);
 							DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset,		\
 											save_bp, size, save_errno);
+							csr->needs_first_write = FALSE;
 						}
 						/* else: We do not hold crit so flushing this is not critical. */
 					} else if (0 == save_errno)
@@ -790,7 +804,8 @@ writes_completed:
 		 */
 		GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
 	}
-	if (INST_FREEZE_ON_ERROR_POLICY)
-		POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data);
+	if (pushed_region)
+
+		POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data, sav_jnlpool);
 	return err_status;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,12 @@
 
 #ifndef MDEF_included
 #define MDEF_included
+
+#ifdef __clang__
+#define CLANG_SCA_ANALYZER_NORETURN __attribute__((analyzer_noreturn))
+#else
+#define CLANG_SCA_ANALYZER_NORETURN
+#endif
 
 /* mstr needs to be defined before including "mdefsp.h".  */
 typedef int mstr_len_t;
@@ -102,7 +108,7 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 /* Anchor for thread-global structure rather than individual global vars */
 GBLREF void	*gtm_threadgbl;		/* Accessed through TREF macro in gtm_threadgbl.h */
 
-#ifdef DEBUG
+#if defined(DEBUG) || defined(STATIC_ANALYSIS_NORETURN)
 error_def(ERR_ASSERT);
 # define assert(x) ((x) ? 1 : rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ASSERT, 5, LEN_AND_LIT(__FILE__), __LINE__,		\
 						(SIZEOF(#x) - 1), (#x)))
@@ -293,6 +299,7 @@ typedef UINTPTR_T uintszofptr_t;
 #define MAX_DIGITS_IN_EXP       2       /* maximum number of decimal digits in an exponent */
 #define MAX_HOST_NAME_LEN	256
 #define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
+#define MAX_INT_IN_BYTE		255
 
 #ifndef _AIX
 #	ifndef __sparc
@@ -490,6 +497,30 @@ mval *underr_strict(mval *start, ...);
 /* Note MV_FORCE_CANONICAL currently only used in op_add() when vars are known to be defined so no MV_FORCE_DEFINED()
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
 */
+#define MV_FORCE_MSTIMEOUT(TMV, TMS, NOTACID)	/* requires a flock of include files especially for TP */		\
+MBSTART {					/* also requires threaddef DCL and SETUP*/				\
+	GBLREF uint4		dollar_tlevel;										\
+	GBLREF uint4		dollar_trestart;									\
+															\
+															\
+	MV_FORCE_NUM(TMV);												\
+	if (NO_M_TIMEOUT == TMV->m[1])											\
+		TMS = NO_M_TIMEOUT;											\
+	else														\
+	{														\
+		assert(MV_BIAS >= 1000);	/* if formats change scale may need attention */			\
+		/* negative becomes 0 larger than MAXPOSINT4 caps to MAXPOSINT4 */					\
+		if (!(TMV->mvtype & MV_INT))										\
+			TMV->e += 3;	/* for non-ints, bump exponent to get millisecs from MV_FORCE_INT */		\
+		TMS = ((TMV->mvtype & MV_INT) ? TMV->m[1] : MIN(MAXPOSINT4, MV_FORCE_INT(TMV)));			\
+		if (!(TMV->mvtype & MV_INT))										\
+			TMV->e -= 3;	/* if we messed with the exponent, restore it to its original value */		\
+		if (0 > TMS)												\
+			TMS = 0;											\
+	}														\
+	if ((TREF(tpnotacidtime)).m[1] < TMS)										\
+		TPNOTACID_CHECK(NOTACID);										\
+} MBEND
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
 				 ,((X)->mvtype & MV_NUM_APPROX ? (X)->mvtype &= MV_NUM_MASK : 0 ))
 #define MV_IS_NUMERIC(X)	(((X)->mvtype & MV_NM) != 0)
@@ -607,8 +638,8 @@ mval *underr_strict(mval *start, ...);
 #define PADLEN(value, bndry) (int)(ROUND_UP2((sm_long_t)(value), bndry) - (sm_long_t)(value))
 
 #define CALLFROM	LEN_AND_LIT(__FILE__), __LINE__
-void gtm_assert(int file_name_len, char file_name[], int line_no);
-int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[], int line_no);
+void gtm_assert(int file_name_len, char file_name[], int line_no)				CLANG_SCA_ANALYZER_NORETURN;
+int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[], int line_no)	CLANG_SCA_ANALYZER_NORETURN;
 #define GTMASSERT	(gtm_assert(CALLFROM))
 #define assertpro(x) ((x) ? 1 : gtm_assert2((SIZEOF(#x) - 1), (#x), CALLFROM))
 #ifdef UNIX
@@ -626,8 +657,8 @@ int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[]
 #define	DBG_MARK_RTS_ERROR_UNUSABLE
 #endif
 
-int	rts_error(int argcnt, ...);
-int	rts_error_csa(void *csa, int argcnt, ...);		/* Use CSA_ARG(CSA) for portability */
+int	rts_error(int argcnt, ...)			CLANG_SCA_ANALYZER_NORETURN;
+int	rts_error_csa(void *csa, int argcnt, ...)	CLANG_SCA_ANALYZER_NORETURN;	/* Use CSA_ARG(CSA) for portability */
 #define CSA_ARG(CSA)	(CSA),
 void	dec_err(uint4 argcnt, ...);
 #elif defined(VMS)
@@ -680,9 +711,9 @@ int4 timeout2msec(int4 timeout);
 
 #ifdef DEBUG
 /* Original debug code has been removed since it was superfluous and did not work on all platforms. SE 03/01 */
-# define SET_TRACEABLE_VAR(var,value) var = value;
+# define SET_TRACEABLE_VAR(var,value) var = value
 #else
-# define SET_TRACEABLE_VAR(var,value) var = value;
+# define SET_TRACEABLE_VAR(var,value) var = value
 #endif
 
 /* If this is unix, we have a faster sleep for short sleeps ( < 1 second) than doing a hiber start.
@@ -1413,6 +1444,8 @@ typedef gtm_uint64_t	gtm_off_t;
 #define MAXUINT8	((gtm_uint64_t)-1)
 #define MAXUINT4	((uint4)-1)
 #define MAXUINT2	((unsigned short)-1)
+
+#define MAXINT4		(MAXUINT4/2)
 #define	MAXINT2		(MAXUINT2/2)
 
 /* On platforms that support native 8 byte operations (such as Alpha), an assignment to an 8 byte field is atomic. On other

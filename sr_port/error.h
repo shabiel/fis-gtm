@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,8 @@ typedef struct err_ctl_struct
 	char		*facname;
 	const err_msg	*fst_msg; /* For VMS, this pointer is not used, and its value will typically be NULL */
 	int		msg_cnt;
+	const int	*undocmsg;
+	int		undocmsg_cnt;
 } err_ctl;
 
 #include "wbox_test_init.h"	/* needed for DUMPABLE macro which uses WBTEST_ENABLED */
@@ -102,7 +104,6 @@ CONDITION_HANDLER(gvzwrite_ch);
 CONDITION_HANDLER(hashtab_rehash_ch);
 CONDITION_HANDLER(io_init_ch);
 CONDITION_HANDLER(iob_io_error);
-CONDITION_HANDLER(iomt_ch);
 CONDITION_HANDLER(jnl_file_autoswitch_ch);
 CONDITION_HANDLER(job_init_ch);
 CONDITION_HANDLER(jobexam_dump_ch);

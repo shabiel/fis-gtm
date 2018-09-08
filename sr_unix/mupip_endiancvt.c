@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -443,7 +443,7 @@ void mupip_endiancvt(void)
 	{	/* Database is encrypted. Initialize encryption and setup the keys to be used in later encryption/decryption */
 		info.database_fn = &db_name[0];
 		info.database_fn_len = n_len;
-		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+		INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 		if (0 == gtmcrypt_errno)
 		{
 			info.encr_handles.encr_key_handle = GTMCRYPT_INVALID_KEY_HANDLE;
@@ -691,6 +691,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(mutex_spin_parms.mutex_hard_spin_count);	/* gdsbt.h */
 	SWAP_SD4(mutex_spin_parms.mutex_sleep_spin_count);
 	SWAP_SD4(mutex_spin_parms.mutex_spin_sleep_mask);
+	SWAP_SD4(mutex_spin_parms.mutex_que_entry_space_size);
 	SWAP_SD4(max_update_array_size);
 	SWAP_SD4(max_non_bm_update_array_size);
 	/* SWAP_SD4(file_corrupt); is set in main routine	*/
@@ -724,7 +725,6 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	/************* FIELDS SET WHEN DB IS OPEN ********************************/
 	new->image_count = 0;		/* should be zero when db is not open so reset it unconditionally */
 	new->freeze = 0;		/* should be zero when db is not open so reset it unconditionally */
-	new->freeze_online = 0;		/* should be zero when db is not open so reset it unconditionally */
 	SWAP_SD4(kill_in_prog);
 	SWAP_SD4(abandoned_kills);
 	/************* FIELDS USED IN V4 <==> V5 COMPATIBILITY MODE ****************/

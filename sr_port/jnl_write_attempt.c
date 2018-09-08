@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,10 +39,13 @@
 #include "io.h"                 /* needed by gtmsecshr.h */
 #include "gtmsecshr.h"          /* for continue_proc */
 #include "gtm_c_stack_trace.h"
+#include "sleep.h"
 
-GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	uint4		process_id;
-GBLREF	uint4		image_count;
+#define	ITERATIONS_100K	100000
+
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	uint4			process_id;
+GBLREF	uint4			image_count;
 
 error_def(ERR_JNLACCESS);
 error_def(ERR_JNLCNTRL);
@@ -59,11 +62,15 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	sgmnt_addrs		*csa;
 	jnl_buffer_ptr_t	jb;
 	unsigned int		status;
-	boolean_t		was_crit, exact_check;
+	boolean_t		was_crit, exact_check, freeze_waiter = FALSE, freeze_cleared;
 	/**** Note static/local */
 	static uint4		loop_image_count, writer;	/* assumes calls from one loop at a time */
 	uint4			new_dskaddr, new_dsk;
+	uint4			dskaddr, freeaddr, free, rsrv_freeaddr;
+	uint4			phase2_commit_index1;
 	static uint4		stuck_cnt = 0;
+	jnlpool_addrs_ptr_t	local_jnlpool;
+	intrpt_state_t		prev_intrpt_state;
 
 	/* Some callers of jnl_sub_write_attempt (jnl_flush->jnl_write_attempt, jnl_write->jnl_write_attempt) are in
 	 * crit, and some other (jnl_wait->jnl_write_attempt) are not. Callers in crit do not need worry about journal
@@ -75,7 +82,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	status = ERR_JNLWRTDEFER;
 	csa = &FILE_INFO(jpc->region)->s_addrs;
 	was_crit = csa->now_crit;
-	exact_check = was_crit && (threshold == jb->freeaddr);	/* see comment in jnl_write_attempt() for why this is needed */
+	exact_check = was_crit && (threshold == jb->rsrv_freeaddr); /* see comment in jnl_write_attempt() for why this is needed */
 	while (exact_check ? (jb->dskaddr != threshold) : (jb->dskaddr < threshold))
 	{
 		if (jb->io_in_prog_latch.u.parts.latch_pid == process_id)
@@ -86,14 +93,36 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		}
 		if (!jb->io_in_prog_latch.u.parts.latch_pid)
-			status = jnl_qio_start(jpc);
-		if (SS_NORMAL == status)
 		{
-			break;
+			if (freeze_waiter)
+			{
+				CLEAR_ANTICIPATORY_FREEZE(freeze_cleared);			/* sets freeze_cleared */
+				REPORT_INSTANCE_UNFROZEN(freeze_cleared);
+				ENABLE_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
+				freeze_waiter = FALSE;
+			}
+			status = jnl_qio_start(jpc);
 		}
-		assert(ERR_JNLWRTNOWWRTR != status);	/* dont have asynchronous jnl writes in Unix */
+		if (SS_NORMAL == status)
+			break;
+		assert(ERR_JNLWRTNOWWRTR != status);	/* don't have asynchronous jnl writes in Unix */
 		if ((ERR_JNLWRTNOWWRTR != status) && (ERR_JNLWRTDEFER != status))
+		{
+			assert(!freeze_waiter);
 			return status;
+		}
+		if (freeze_waiter)
+		{
+			if (!IS_REPL_INST_FROZEN)
+			{	/* Somehow the freeze was lifted by someone else */
+				ENABLE_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
+				freeze_waiter = FALSE;
+			} else
+			{
+				wcs_sleep(*lcnt);
+				continue;
+			}
+		}
 		if ((writer != CURRENT_JNL_IO_WRITER(jb)) || (1 == *lcnt))
 		{
 			writer = CURRENT_JNL_IO_WRITER(jb);
@@ -124,25 +153,46 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 				rel_crit(jpc->region);
 			/* this is the interesting case: a process is stuck */
 			BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_stuck);
+			if (IS_REPL_INST_FROZEN)
+			{	/* Restart if instance frozen. */
+				*lcnt = 1;
+				continue;
+			}
 			jpc->status = status;
 			jnl_send_oper(jpc, ERR_JNLFLUSH);
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, writer);
 			stuck_cnt++;
+			if (IS_REPL_INST_FROZEN)
+			{	/* The instance wasn't frozen above, but it is now, so most likely we froze it.
+				 * Note the fact.
+				 * Deferring interrupts here prevents possible hangs in GET_C_STACK_FROM_SCRIPT.
+				 */
+				DEFER_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
+				freeze_waiter = TRUE;
+			}
 			GET_C_STACK_FROM_SCRIPT("JNLPROCSTUCK", process_id, writer, stuck_cnt);
 			*lcnt = 1;	/* ??? is it necessary to limit this, and if so, how ??? */
+			if (freeze_waiter)
+			{	/* We are frozen, so restart. */
+				continue;
+			}
 			status = ERR_JNLPROCSTUCK;
 			continue_proc(writer);
 			break;
 		}
 		break;
 	}
-	if ((threshold > jb->freeaddr)
-		|| (csa->now_crit && ((jb->dskaddr > jb->freeaddr) || (jb->free != (jb->freeaddr % jb->size)))))
-	{	/* threshold > jb->freeaddr => somebody decremented jb->freeaddr after we computed threshold, or jnl was switched
-		 * jb->dsk != jb->freeaddr % jb->size => out of design condition
-		 * jb->dskaddr > jb->freeaddr => out of design condition, or jnl was switched
+	if (csa->now_crit && (jb->dskaddr > jb->freeaddr))
+	{	/* jb->dskaddr > jb->freeaddr => out of design condition if we have crit.
+		 * If we don't have crit, a journal switch could have occurred, so not an error condition.
 		 */
 		status = ERR_JNLCNTRL;
+	}
+	if (freeze_waiter)
+	{
+		CLEAR_ANTICIPATORY_FREEZE(freeze_cleared);			/* sets freeze_cleared */
+		REPORT_INSTANCE_UNFROZEN(freeze_cleared);
+		ENABLE_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
 	}
 	return status;
 }
@@ -150,8 +200,10 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 {
 	jnl_buffer_ptr_t	jb;
+	uint4			prev_freeaddr;
 	unsigned int		lcnt, prev_lcnt, cnt;
 	sgmnt_addrs		*csa;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	unsigned int		status;
 	boolean_t		was_crit, jnlfile_lost, exact_check;
 	DCL_THREADGBL_ACCESS;
@@ -159,19 +211,22 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	SETUP_THREADGBL_ACCESS;
 	jb = jpc->jnl_buff;
 	csa = &FILE_INFO(jpc->region)->s_addrs;
+	save_jnlpool = jnlpool;
+	if (csa->jnlpool && (csa->jnlpool != jnlpool))
+		jnlpool = csa->jnlpool;
 	was_crit = csa->now_crit;
 
-	/* If holding crit and input threshold matches jb->freeaddr, then we need to wait in the loop as long as dskaddr
+	/* If holding crit and input threshold matches jb->rsrv_freeaddr, then we need to wait in the loop as long as dskaddr
 	 * is not EQUAL to threshold. This is because if dskaddr is lesser than threshold we need to wait. If ever it
-	 * becomes greater than threshold, it is an out-of-design situation (since dskaddr has effectively become > freeaddr)
+	 * becomes greater than threshold, it is an out-of-design situation (since dskaddr has effectively become > rsrv_freeaddr)
 	 * and so we need to trigger "jnl_file_lost" which is done in "jnl_sub_write_attempt" so it is important to invoke
 	 * that routine (in the for loop below). Hence the need to do an exact match instead of a < match. If not holding
-	 * crit or input threshold does not match jb->freeaddr, then dskaddr becoming GREATER than threshold is a valid
+	 * crit or input threshold does not match jb->rsrv_freeaddr, then dskaddr becoming GREATER than threshold is a valid
 	 * condition so we should do a (dskaddr < threshold), not a (dskaddr != threshold) check in that case.
 	 */
-	exact_check = was_crit && (threshold == jb->freeaddr);
-	assert(!was_crit || threshold <= jb->freeaddr);
-	/* Check that we either own crit on the current region or we DONT own crit on ANY region. This is relied upon by
+	exact_check = was_crit && (threshold == jb->rsrv_freeaddr);
+	assert(!was_crit || threshold <= jb->rsrv_freeaddr);
+	/* Check that we either own crit on the current region or we don't own crit on ANY region. This is relied upon by
 	 * the grab_crit calls (done in jnl_write_attempt and jnl_sub_write_attempt) to ensure no deadlocks are possible.
 	 */
 	assert(was_crit || (0 == have_crit(CRIT_HAVE_ANY_REG)));
@@ -179,12 +234,44 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 		(was_crit || (NOJNL != jpc->channel)) && (exact_check ? jb->dskaddr != threshold : jb->dskaddr < threshold);
 		lcnt++, prev_lcnt = lcnt, cnt++)
 	{
+		prev_freeaddr = jb->freeaddr;
+		if (prev_freeaddr < threshold)
+		{
+			JNL_PHASE2_CLEANUP_IF_POSSIBLE(csa, jb); /* phase2 commits in progress. Clean them up if possible */
+			if (prev_freeaddr == jb->freeaddr)
+			{	/* No cleanup happened implies process in phase2 commit is still alive.
+				 * Give it some time to finish its job. Not sleeping here could result in a spinloop
+				 * below (due to the "continue" below under the "SS_NORMAL == status" if check).
+				 */
+				BG_TRACE_PRO_ANY(csa, jnl_phase2_cleanup_if_possible);
+				SLEEP_USEC(1, FALSE);
+				if (!was_crit && (0 == (lcnt % ITERATIONS_100K)))
+				{	/* We do not have crit and have slept a while (100K iterations of 1-micro-second each
+					 * == a total of ~ 100 milli-seconds). See if crit can be obtained that way the
+					 * JNL_PHASE2_CLEANUP_IF_POSSIBLE macro will attempt "jnl_phase2_salvage" if needed.
+					 * An example scenario where this is needed is if a process is in "gds_rundown"->"jnl_wait"
+					 * and does not hold crit but has written journal records after those written by another
+					 * process which was kill -9ed in phase2 of its jnl commit. Not doing this check would
+					 * cause the process in gds_rundown to be indefinitely stuck in "jnl_wait".
+					 */
+					if (grab_crit_immediate(jpc->region, OK_FOR_WCS_RECOVER_TRUE))
+					{
+						JNL_PHASE2_CLEANUP_IF_POSSIBLE(csa, jb); /* phase2 commits in progress.
+											  * Clean them up if possible.
+											  */
+						rel_crit(jpc->region);
+					}
+				}
+			}
+		}
 		status = jnl_sub_write_attempt(jpc, &lcnt, threshold);
 		if (JNL_FILE_SWITCHED(jpc))
 		{	/* If we are holding crit, the journal file switch could happen in the form of journaling getting
 			 * turned OFF (due to disk space issues etc.)
 			 */
 			jpc->status = SS_NORMAL;
+			if (save_jnlpool != jnlpool)
+				jnlpool = save_jnlpool;
 			return SS_NORMAL;
 		}
 		if (SS_NORMAL == status)
@@ -209,41 +296,40 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
 			}
 			jnlfile_lost = FALSE;
-			if (jb->free_update_pid)
-			{
-				FIX_NONZERO_FREE_UPDATE_PID(csa, jb);
-			} else
-			{
-				assert((gtm_white_box_test_case_enabled
-					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))
-				       || TREF(gtm_test_fake_enospc) || WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC));
-				if (JNL_ENABLED(csa->hdr))
-				{	/* We ignore the return value of jnl_file_lost() since we always want to report the journal
-					 * error, whatever its error handling method is.  Also, an operator log will be sent by some
-					 * callers (t_end()) only if an error is returned here, and the operator log is wanted in
-					 * those cases.
-					 */
-					jnl_file_lost(jpc, status);
-					jnlfile_lost = TRUE;
-				}
-				/* Else journaling got closed concurrently by another process by invoking "jnl_file_lost"
-				 * just before we got crit. Do not invoke "jnl_file_lost" again on the same journal file.
-				 * Instead continue and next iteration will detect the journal file has switched and terminate.
+			assert((gtm_white_box_test_case_enabled
+				&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))
+			       || TREF(gtm_test_fake_enospc) || WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC));
+			if (JNL_ENABLED(csa->hdr))
+			{	/* We ignore the return value of jnl_file_lost() since we always want to report the journal
+				 * error, whatever its error handling method is.  Also, an operator log will be sent by some
+				 * callers (t_end()) only if an error is returned here, and the operator log is wanted in
+				 * those cases.
 				 */
+				jnl_file_lost(jpc, status);
+				jnlfile_lost = TRUE;
 			}
+			/* Else journaling got closed concurrently by another process by invoking "jnl_file_lost"
+			 * just before we got crit. Do not invoke "jnl_file_lost" again on the same journal file.
+			 * Instead continue and next iteration will detect the journal file has switched and terminate.
+			 */
 			if (!was_crit)
 				rel_crit(jpc->region);
 			if (!jnlfile_lost)
 				continue;
 			else
+			{
+				if (save_jnlpool != jnlpool)
+					jnlpool = save_jnlpool;
 				return status;
+			}
 		}
-		if ((ERR_JNLWRTDEFER == status) && IS_REPL_INST_FROZEN)
+		if (ERR_JNLWRTDEFER == status)
 		{	/* Check if the write was deferred because the instance is frozen.
 			 * In that case, wait until the freeze is lifted instead of wasting time spinning on the latch
 			 * in jnl_qio.
 			 */
-			 WAIT_FOR_REPL_INST_UNFREEZE(csa);
+			assert(!csa->jnlpool || (csa->jnlpool == jnlpool));
+			WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
 		}
 		if ((ERR_JNLWRTDEFER != status) && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLPROCSTUCK != status))
 		{	/* If holding crit, then jnl_sub_write_attempt would have invoked jnl_file_lost which would have
@@ -269,5 +355,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			}
 		}
 	}
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
 	return SS_NORMAL;
 }

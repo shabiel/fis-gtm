@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -148,14 +148,17 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 				return OBJMODMISS;
 			}
 		}
-#		ifdef AUTORELINK_SUPPORTED
-		/* We have the routine now but double check if we need to load a newer one */
-		explicit_relink_check(rtn_vector, TRUE);
+	}
+#	ifdef AUTORELINK_SUPPORTED
+	if (!(WANT_CURRENT_RTN(routine)) && !is_trigger)
+	{	/* We have the routine now but double check if we need to load a newer one */
+		DEBUG_ONLY(rtn_vector->rtn_relinked = FALSE);			/* meet expectations of assert in checker below */
+		explicit_relink_check(rtn_vector, TRUE);			/* meant for code invokers, not code displayers */
 		rtn_vector = (TABENT_PROXY).rtnhdr_adr;
 		assert(NULL != rtn_vector);
 		DBGARLNK((stderr, "get_src_line: Fetching routine source for rtnhdr 0x"lvaddr"\n", rtn_vector));
-#		endif
 	}
+#	endif
 	if (NULL != rtn_vec)
 		*rtn_vec = rtn_vector;
 	if (!rtn_vector->src_full_name.len)
@@ -373,6 +376,9 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 				{
 					FCLOSE(fp, fclose_res);
 					assert(!fclose_res);
+					if (src_tbl->srcbuff)
+						free(src_tbl->srcbuff);
+					free(src_tbl);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TXTSRCFMT, 0, errno);
 					assert(FALSE);
 				} else
@@ -386,8 +392,8 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 				size = (int)STRLEN(buff);
 				prev_srcptr = srcptr;
 				srcptr += size;
-				if (srcptr > (src_tbl->srcbuff + srcsize))
-				{	/* source file has been concurrently overwritten (and extended) */
+				if ((NULL == src_tbl->srcbuff) || (srcptr > (src_tbl->srcbuff + srcsize)))
+				{	/* source file has been concurrently overwritten (and extended or truncated) */
 					srcstat |= CHECKSUMFAIL;
 					eof_seen = TRUE;
 					size = 0;
@@ -414,7 +420,8 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	}
 	if (found)
 	{
-		*base = *(base + 1);
+		if (srcrecs > 1)
+			*base = *(base + 1);
 		/* Ensure we have reached the end of the source file. If not, we need to issue a CHECKSUMFAIL
 		 * error. Most often the !eof_seen part of the check is not needed since the checksums will not
 		 * match. But if it so happens that the checksums do match, then this extra check helps us

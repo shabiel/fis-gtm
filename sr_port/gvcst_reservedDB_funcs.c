@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,11 +42,15 @@
 #include "parse_file.h"
 #include "getzposition.h"
 #include "util.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+
 
 LITREF mval		literal_statsDB_gblname;
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data	*cs_data;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF uint4		process_id;
 GBLREF uint4		dollar_tlevel;
 GBLREF gd_region	*gv_cur_region;
@@ -56,14 +60,17 @@ GBLREF boolean_t	need_core;
 GBLREF boolean_t	created_core;
 GBLREF boolean_t	dont_want_core;
 GBLREF gd_addr		*gd_header;
+GBLREF mstr		extnam_str;
 DEBUG_ONLY(GBLREF boolean_t    ok_to_UNWIND_in_exit_handling;)
 
-static gd_region	*save_statsDBreg;	/* For use in condition handler */
+STATICDEF intrpt_state_t	gvcst_statsDB_open_ch_intrpt_ok_state;
+STATICDEF gd_region		*save_statsDBreg;	/* For use in condition handler */
 
 /* Macro to restore the values that were saved at the start of the routine */
 #define RESTORE_SAVED_VALUES					\
 MBSTART {							\
 	TP_CHANGE_REG(save_cur_region);				\
+	jnlpool = save_jnlpool;					\
 	gv_target = save_gv_target;				\
 	reset_gv_target = save_reset_gv_target;			\
 	RESTORE_GV_ALTKEY(save_altkey);				\
@@ -77,7 +84,9 @@ MBSTART {							\
 } MBEND
 
 error_def(ERR_DBPRIVERR);
+error_def(ERR_DRVLONGJMP);	/* Generic internal only error used to drive longjump() in a queued condition handler */
 error_def(ERR_RNDWNSTATSDBFAIL);
+error_def(ERR_STATSDBERR);
 
 /* This routine is a wrapper for mu_cre_file() when called from GTM. The issue is mu_cre_file() was written to run
  * largely stand-alone and then quit. So it uses stack vars for all the needed database structures and initializes only
@@ -95,19 +104,22 @@ error_def(ERR_RNDWNSTATSDBFAIL);
  */
 unsigned char gvcst_cre_autoDB(gd_region *reg)
 {
-	gd_region	*save_cur_region;
-	gd_region	cur_region;
-	gd_segment	cur_segment;
-	unsigned char	cstatus;
+	gd_region		*save_cur_region;
+	gd_region		cur_region;
+	gd_segment		cur_segment;
+	jnlpool_addrs_ptr_t	save_jnlpool;
+	unsigned char		cstatus;
 
 	assert(RDBF_AUTODB & reg->reservedDBFlags);
 	save_cur_region = gv_cur_region;
+	save_jnlpool = jnlpool;
 	memcpy((char *)&cur_region, reg, SIZEOF(gd_region));
 	memcpy((char *)&cur_segment, reg->dyn.addr, SIZEOF(gd_segment));
 	gv_cur_region = &cur_region;
 	gv_cur_region->dyn.addr = &cur_segment;
 	cstatus = mu_cre_file();
 	TP_CHANGE_REG(save_cur_region);
+	jnlpool = save_jnlpool;
 	return cstatus;
 }
 
@@ -140,9 +152,10 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 	mval				statsDBrec_mval, statsDBget_mval;
 	gd_region			*statsDBreg, *statsDBreg_located, *save_cur_region;
 	gv_namehead			*save_gv_target, *save_reset_gv_target;
+	jnlpool_addrs_ptr_t		save_jnlpool;
 	srch_blk_status 		*bh;
 	char				statsDBinitrec[SIZEOF(gvstats_rec_t) * 2];	/* Gives chunk large enuf to hold pad */
-	int				sizewkey, sizewkeyrnd, padsize, freespace, datasize;
+	int				datasize, extlen, freespace, padsize, sizewkey, sizewkeyrnd;
 	gv_key				save_altkey[DBKEYALLOC(MAX_KEY_SZ)], save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	sgmnt_addrs			*baseDBcsa, *statsDBcsa;
 	statsDB_deferred_init_que_elem	*sdiqeptr;
@@ -159,7 +172,6 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 
 	SETUP_THREADGBL_ACCESS;
 	BASEDBREG_TO_STATSDBREG(baseDBreg, statsDBreg_located);
-	assert(!statsDBreg_located->statsDB_setup_completed);
 	assert(baseDBreg->open);
 	assert(dba_cm != baseDBreg->dyn.addr->acc_meth);
 	baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
@@ -169,7 +181,9 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 				 * initialized even if we break out of the for loop due to an error even before
 				 * this variable got initialized as part of the second ESTABLISH_NORET below.
 				 */
+	gvcst_statsDB_open_ch_intrpt_ok_state = intrpt_ok_state;	/* needed by "gvcst_statsDB_open_ch" */
 	ESTABLISH_NORET(gvcst_statsDB_open_ch, longjmp_done1);
+
 	for ( ; !longjmp_done1; )	/* have a dummy for loop to be able to use "break" for various codepaths below */
 	{
 		if (!do_statsdb_init)
@@ -179,7 +193,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			 * (user-invisible) and the caller will modify gld map entries and/or switch baseDB to NOSTATS if any
 			 * errors occur thereby preventing future access to this statsDB database file.
 			 */
-			gvcst_init(statsDBreg_located);
+			gvcst_init(statsDBreg_located, NULL);
 			if (statsDBreg_located->open)		/* do the check just in case */
 			{
 				statsDBcsa = &FILE_INFO(statsDBreg_located)->s_addrs;
@@ -216,10 +230,11 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			 * and "OPEN_BASEREG_IF_STATSREG" rely on this open to happen here (and catch errors) so they
 			 * can take appropriate action (see comment in OPEN_BASEREG_IF_STATSREG for example reason).
 			 */
-			gvcst_init(statsDBreg_located);
+			gvcst_init(statsDBreg_located, NULL);
 			break;
 		}
 		save_cur_region = gv_cur_region;
+		save_jnlpool = jnlpool;
 		save_gv_target = gv_target;
 		save_reset_gv_target = reset_gv_target;
 		SAVE_GV_CURRKEY(save_currkey);
@@ -241,7 +256,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 		save_gd_header = gd_header;	/* save "gd_header" before tampering with global variable */
 		gd_header = baseDBreg->owning_gd; /* direct "op_gvname" to search for maps in this gld */
 		/* Must have baseDB open and be opted in to be here */
-		assert(TREF(statshare_opted_in));
+		assert(NO_STATS_OPTIN != TREF(statshare_opted_in));
 		assert(!IS_DSE_IMAGE);	/* DSE opens a statsdb only directly (never through a base DB) */
 		/* Create a condition handler so the above saved items can be undone on an error to restore the environment */
 		ESTABLISH_NORET(gvcst_statsDB_init_ch, longjmp_done2);
@@ -252,18 +267,6 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			REVERT;
 			RESTORE_SAVED_VALUES;
 			break;
-		}
-		/* If this statsDB was previously opened by direct references to ^%YGS, gvcst_init() will have set the DB
-		 * to R/O mode so if it was previously opened, we need to set it back to write-mode to add the needed
-		 * gvstats record.
-		 */
-		if (statsDBreg_located->open)
-		{	/* This statsDB was already open so we have to reset the R/O flags so we can add the process record */
-			assert(!statsDBreg_located->statsDB_setup_completed);
-			statsDBcsa = &FILE_INFO(statsDBreg_located)->s_addrs;
-			assert(statsDBcsa->orig_read_write);
-			statsDBreg_located->read_only = FALSE;			/* Maintain read_only/read_write in parallel */
-			statsDBcsa->read_write = TRUE;				/* Maintain reg->read_only simultaneously */
 		}
 		/* Create mvals with region name and processid in them to feed to op_gvname */
 		memset((char *)&baseDBreg_nam_mval, 0, SIZEOF(mval));
@@ -318,7 +321,9 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			}
 			gd_header->ygs_map_entry_changed = TRUE;
 		}
+		extlen = extnam_str.len;
 		op_gvname(3, (mval *)&literal_statsDB_gblname, &baseDBreg_nam_mval, &pid_mval);
+		extnam_str.len = extlen;
 		assert(NULL != gv_currkey);
 		assert(0 != gv_currkey->end);
 		statsDBreg = gv_cur_region;
@@ -334,10 +339,10 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 		if (!statsDBcsa->orig_read_write)
 			/* Database was opened read/only as this process has no privs to write to it - raise error */
 			rts_error_csa(CSA_ARG(statsDBcsa) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(statsDBreg));
-		assert(!statsDBreg->statsDB_setup_completed);
 		if (!statsDBcsa->statsDB_setup_completed)
 		{	/* If initialization was never completed, do it now */
 			assert(IS_STATSDB_REG(statsDBreg));
+			assert(statsDBcsa->orig_read_write);
 			/* Step 2: Now figure out the alignment pad size needed to make record fields align in memory */
 			sizewkey = SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + gv_currkey->end + 1;
 			sizewkeyrnd = ROUND_UP2(sizewkey, SIZEOF(gtm_uint64_t));
@@ -355,10 +360,18 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			statsDBrec_mval.mvtype = MV_STR;
 			statsDBrec_mval.str.addr = statsDBinitrec;
 			statsDBrec_mval.str.len = padsize + SIZEOF(gvstats_rec_t);
+			/* If this statsDB was previously opened by direct references to ^%YGS, gvcst_init() will have set the DB
+			 * to R/O mode so if it was previously opened, we need to set it back to write-mode to add the needed
+			 * gvstats record.
+			 */
+			assert(statsDBreg_located == statsDBreg);
+			statsDBreg->read_only = FALSE;				/* Maintain read_only/read_write in parallel */
+			statsDBcsa->read_write = TRUE;				/* Maintain reg->read_only simultaneously */
 			op_gvput(&statsDBrec_mval);
+			statsDBreg->read_only = TRUE;
+			statsDBcsa->read_write = FALSE;				/* Maintain read_only/read_write in parallel */
 			/* Step 3: Now we have written a record - set the DB to R/O */
 			assert(statsDBcsa == &FILE_INFO(statsDBreg)->s_addrs);
-			assert(statsDBcsa->orig_read_write);
 			/* Step 4: Locate the newly written record and update the csa->gvstats_rec_p so new stats updates occur
 			 *         in shared memory instead of process-private.
 			 */
@@ -375,8 +388,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			assert(0 == (((UINTPTR_T)baseDBcsa->gvstats_rec_p) & 0x7));		/* Verify 8 byte alignment */
 			statsDBcsa->statsDB_setup_completed = TRUE;
 		}
-		statsDBreg->read_only = TRUE;
-		statsDBcsa->read_write = FALSE;				/* Maintain read_only/read_write in parallel */
+		statsDBreg->statsDB_setup_started = FALSE;
 		statsDBreg->statsDB_setup_completed = TRUE;
 		REVERT;
 		/* Restore previous region's setup */
@@ -405,6 +417,36 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 	return;
 }
 
+/* Simplistic handler for when errors occur during open of statsDB. The ESTABLISH_NORET is a place-holder for the
+ * setjmp/longjmp sequence used to recover quietly from errors opening* the statsDB. So if the error is the magic
+ * ERR_DRVLONGJMP, do just that (longjmp() via the UNWIND() macro). If the error is otherwise, capture the error
+ * and where it was raised and send the STATSDBERR to the syslog before we unwind back to the ESTABLISH_NORET.
+ */
+CONDITION_HANDLER(gvcst_statsDB_open_ch)
+{
+	char	buffer[OUT_BUFF_SIZE];
+	int	msglen;
+	mval	zpos;
+
+	START_CH(TRUE);
+	assert(ERR_DBROLLEDBACK != arg);	/* A statsDB region should never participate in rollback */
+	if (DUMPABLE)
+		NEXTCH;				/* Bubble down till handled properly in mdb_condition_handler() */
+	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
+		CONTINUE;			/* Keep going for non-error issues */
+	if (ERR_DRVLONGJMP != arg)
+	{	/* Need to reflect the current error to the syslog - First save message that got us here */
+		msglen = TREF(util_outptr) - TREF(util_outbuff_ptr);
+		assert(OUT_BUFF_SIZE > msglen);
+		memcpy(buffer, TREF(util_outbuff_ptr), msglen);
+		getzposition(&zpos);
+		/* Send whole thing to syslog */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STATSDBERR, 4, zpos.str.len, zpos.str.addr, msglen, buffer);
+	}
+	intrpt_ok_state = gvcst_statsDB_open_ch_intrpt_ok_state;
+	UNWIND(NULL, NULL);			/* Return back to where ESTABLISH_NORET was done */
+}
+
 /* Condition handler for gvcst_statsDB_init() - all we need to do is unwind back to where the ESTABLISH_NORET() is done
  * as the code at that point can do the needful in the frame of reference it needs to be done.
  */
@@ -428,24 +470,25 @@ CONDITION_HANDLER(gvcst_statsDB_init_ch)
  */
 void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 {
-	mval		pid_mval, baseDBreg_nam_mval;
-	mval		statsDBrec_mval, statsDBget_mval;
-	gd_region	*statsDBreg, *save_cur_region;
-	gv_namehead	*save_gv_target, *save_reset_gv_target;
-	char		statsDBinitrec[SIZEOF(gvstats_rec_t) * 2];	/* Gives us a chunk large enuf to hold padding */
-	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
-	sgmnt_addrs	*baseDBcsa, *statsDBcsa;
-	gvstats_rec_t	*gvstats_rec_p;
-	gvnh_reg_t	*save_gd_targ_gvnh_reg;
-	gd_binding	*save_gd_targ_map;
-	gd_addr		*save_gd_targ_addr, *save_gd_header;
-	boolean_t	save_gv_last_subsc_null, save_gv_some_subsc_null;
+	mval			pid_mval, baseDBreg_nam_mval;
+	mval			statsDBrec_mval, statsDBget_mval;
+	gd_region		*statsDBreg, *save_cur_region;
+	gv_namehead		*save_gv_target, *save_reset_gv_target;
+	char			statsDBinitrec[SIZEOF(gvstats_rec_t) * 2];	/* Gives us a chunk large enuf to hold padding */
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	sgmnt_addrs		*baseDBcsa, *statsDBcsa;
+	gvstats_rec_t		*gvstats_rec_p;
+	gvnh_reg_t		*save_gd_targ_gvnh_reg;
+	gd_binding		*save_gd_targ_map;
+	gd_addr			*save_gd_targ_addr, *save_gd_header;
+	jnlpool_addrs_ptr_t	save_jnlpool;
+	boolean_t		save_gv_last_subsc_null, save_gv_some_subsc_null;
 #	ifdef DEBUG
-	mval		stats_rec;
-	srch_blk_status *bh;
-	uint4		recsize;
-	rec_hdr		*recptr;
-	gd_region	*statsDBreg_located;
+	mval			stats_rec;
+	srch_blk_status		*bh;
+	uint4			recsize;
+	rec_hdr			*recptr;
+	gd_region		*statsDBreg_located;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -455,14 +498,13 @@ void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 	save_gv_target = gv_target;
 	save_reset_gv_target = reset_gv_target;
 	SAVE_GV_CURRKEY(save_currkey);
+	save_jnlpool = jnlpool;
 	/* Below save is similar to that done in op_gvsavtarg/op_gvrectarg */
 	save_gd_targ_gvnh_reg = TREF(gd_targ_gvnh_reg);
 	save_gd_targ_map = TREF(gd_targ_map);
 	save_gd_targ_addr = TREF(gd_targ_addr);
 	save_gv_last_subsc_null = TREF(gv_last_subsc_null);
 	save_gv_some_subsc_null = TREF(gv_some_subsc_null);
-	/* The baseDB does not have to be open but if it is, stats will be unshared */
-	assert(TREF(statshare_opted_in));
 	/* Create mvals with region name and processid in them to feed to op_gvname */
 	memset((char *)&baseDBreg_nam_mval, 0, SIZEOF(mval));
 	baseDBreg_nam_mval.mvtype = MV_STR;
@@ -475,6 +517,13 @@ void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 	 */
 	save_gd_header = gd_header;	/* save "gd_header" before tampering with global variable */
 	gd_header = baseDBreg->owning_gd; /* direct "op_gvname" to search for maps in this gld */
+	/* We have already saved gv_currkey at function entry and are tampering with it in this function.
+	 * The "op_gvname" call does a DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC check which would cross-check gv_currkey
+	 * & gv_target. That check could fail if this function was called when the two were not in sync (possible for
+	 * example if the call stack is "op_gvorder -> gv_init_reg -> gvcst_init -> gvcst_init_statsDB". So bypass that
+	 * check by clearing the key.
+	 */
+	DEBUG_ONLY(gv_currkey->base[0] = KEY_DELIMITER;) /* to bypass DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC in op_gvname */
 	op_gvname(3, (mval *)&literal_statsDB_gblname, &baseDBreg_nam_mval, &pid_mval);
 	assert(NULL != gv_currkey);
 	assert(0 != gv_currkey->end);
@@ -491,10 +540,8 @@ void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 	 * would map to the same statsDBcsa and might end up calling this function more than once for the same statsDBcsa.
 	 * In that case, do the removal of ^%YGS node only once. The below check accomplishes that.
 	 */
-	statsDBreg->read_only = FALSE;
 	if (statsDBcsa->statsDB_setup_completed)
 	{
-		statsDBcsa->read_write = TRUE;				/* Maintain read_only/read_write in parallel */
 		assert(statsDBcsa->orig_read_write);
 		/* Step 3: Copy the shared gvstats_rec_t data back to private and for debug, verify record address in DEBUG but only
 		 *         if the baseDB is actually still open.
@@ -520,13 +567,16 @@ void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 			baseDBcsa->gvstats_rec_p = &baseDBcsa->gvstats_rec;	/* ==> Reset start of gvstats_rec_t to private */
 		}
 		/* Step 4: Kill the record */
+		statsDBreg->read_only = FALSE;
+		statsDBcsa->read_write = TRUE;				/* Maintain read_only/read_write in parallel */
 		op_gvkill();
+		statsDBreg->read_only = TRUE;
+		statsDBcsa->read_write = FALSE;				/* Maintain read_only/read_write in parallel */
 		statsDBcsa->statsDB_setup_completed = FALSE;
 	}
-	statsDBreg->statsDB_setup_started = FALSE;
-	statsDBreg->statsDB_setup_completed = FALSE;
 	/* Restore previous region's setup */
 	TP_CHANGE_REG(save_cur_region);
+	jnlpool = save_jnlpool;
 	gv_target = save_gv_target;
 	reset_gv_target = save_reset_gv_target;
 	RESTORE_GV_CURRKEY(save_currkey);
@@ -536,63 +586,6 @@ void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 	TREF(gv_last_subsc_null) = save_gv_last_subsc_null;
 	TREF(gv_some_subsc_null) = save_gv_some_subsc_null;
 	gd_header = save_gd_header;
-}
-
-/* Routine to opt-in opening statsDB for all open databases */
-void gvcst_statshare_optin(void)
-{
-	gd_addr		*gdhdr_addr;
-	gd_region	*r_save, *r_top;
-	gd_region	*baseDBreg, *statsDBreg;
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	assert(0 == dollar_tlevel);
-	TREF(statshare_opted_in) = TRUE;
-	for (gdhdr_addr = get_next_gdr(NULL); NULL != gdhdr_addr; gdhdr_addr = get_next_gdr(gdhdr_addr))
-	{	/* For each global directory */
-		for (baseDBreg = gdhdr_addr->regions, r_top = baseDBreg + gdhdr_addr->n_regions; baseDBreg < r_top; baseDBreg++)
-		{	/* For each region */
-			if (!IS_REG_BG_OR_MM(baseDBreg) || IS_STATSDB_REG(baseDBreg))
-				continue;
-			if (RDBF_NOSTATS & baseDBreg->reservedDBFlags)
-				continue;
-			if (baseDBreg->open)
-			{	/* Initialize statsDB for the given baseDB region */
-				BASEDBREG_TO_STATSDBREG(baseDBreg, statsDBreg);
-				statsDBreg->statsDB_setup_started = TRUE;
-				gvcst_init_statsDB(baseDBreg, DO_STATSDB_INIT_TRUE);
-			}
-		}
-	}
-}
-
-/* Routine to opt-out running down statsDBs for all open databases */
-void gvcst_statshare_optout(void)
-{
-	gd_addr		*gdhdr_addr;
-	gd_region	*r_top, *r_save, *baseDBreg, *statsDBreg;
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	assert(0 == dollar_tlevel);
-	for (gdhdr_addr = get_next_gdr(NULL); gdhdr_addr; gdhdr_addr = get_next_gdr(gdhdr_addr))
-	{	/* For each global directory */
-		for (baseDBreg = gdhdr_addr->regions, r_top = baseDBreg + gdhdr_addr->n_regions; baseDBreg < r_top; baseDBreg++)
-		{	/* For each region */
-			if (!IS_REG_BG_OR_MM(baseDBreg) || IS_STATSDB_REG(baseDBreg))
-				continue;
-			if (RDBF_NOSTATS & baseDBreg->reservedDBFlags)
-				continue;
-			if (baseDBreg->open)
-			{
-				BASEDBREG_TO_STATSDBREG(baseDBreg, statsDBreg);
-				if (statsDBreg->open && statsDBreg->statsDB_setup_completed)
-					gvcst_remove_statsDB_linkage(baseDBreg);
-			}
-		}
-	}
-	TREF(statshare_opted_in) = FALSE;
 }
 
 /* Routine to remove the statsDB linkages between the statsDB databases and the baseDBs for all open statsDBs.
@@ -680,12 +673,6 @@ CONDITION_HANDLER(gvcst_remove_statsDB_linkage_ch)
 	mval	zpos;
 
 	START_CH(TRUE);
-	PRN_ERROR;
-	if (DUMPABLE && !SUPPRESS_DUMP)
-	{
-		need_core = TRUE;
-		gtm_fork_n_core();
-	}
 	/* Save error that brought us here */
 	msglen = TREF(util_outptr) - TREF(util_outbuff_ptr);
 	assert(OUT_BUFF_SIZE > msglen);
@@ -694,6 +681,11 @@ CONDITION_HANDLER(gvcst_remove_statsDB_linkage_ch)
 	/* Send whole thing to syslog */
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RNDWNSTATSDBFAIL, 10, REG_LEN_STR(save_statsDBreg),
 		     DB_LEN_STR(save_statsDBreg), zpos.str.len, zpos.str.addr, msglen, buffer);
+	if (DUMPABLE && !SUPPRESS_DUMP)
+	{
+		need_core = TRUE;
+		gtm_fork_n_core();
+	}
 	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);
 	UNWIND(NULL, NULL);		/* This returns back to gvcst_remove_statsDB_linkage_all() to do next region */
 }

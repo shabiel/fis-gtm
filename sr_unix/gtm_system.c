@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
 #include "gtm_signal.h"
+#include "gtm_string.h"
 
 #include <sys/wait.h>
 #include <errno.h>
@@ -30,13 +31,21 @@
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, RC);	\
 }
 
+error_def(ERR_INVSTRLEN);
+
 int gtm_system(const char *cmdline)
+{
+	return gtm_system_internal(NULL, NULL, NULL, cmdline);
+}
+
+int gtm_system_internal(const char *sh, const char *opt, const char *rtn, const char *cmdline)
 {
 	struct sigaction	ignore, old_intrpt, old_quit;
 	sigset_t		mask, savemask;
 	pid_t			pid;
 	int			stat;		/* child exit status */
 	int			rc, ret;	/* return value from waitpid */
+	int			len, shlen;
 	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
@@ -68,6 +77,12 @@ int gtm_system(const char *cmdline)
 		ENABLE_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM, prev_intrpt_state);
 		return -1;
 	}
+	/* Shell and command options */
+	if (NULL == opt)
+		opt = "-c";
+	if (NULL == sh)
+		sh = GETENV("SHELL");
+	sh = (NULL == sh) || ('\0' == *sh) ? "/bin/sh" : sh;
 	/* Below FORK is not used as interrupts are already disabled at the
 	 * beginning of this function
 	 */
@@ -81,7 +96,11 @@ int gtm_system(const char *cmdline)
 	else if (0 == pid)
 	{
 		RESTOREMASK(rc);
-		execl("/bin/sh", "sh", "-c", cmdline, (char *)0);
+		assert('\0' != *cmdline);
+		if (NULL == rtn)
+			execl(sh, sh, opt, cmdline, NULL);
+		else
+			execl(sh, sh, opt, rtn, cmdline, NULL);
 		UNDERSCORE_EXIT(127);
 	} else
 	{

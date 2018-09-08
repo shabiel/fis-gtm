@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -114,6 +114,7 @@ static readonly char zroutines_text[] = "$ZROUTINES";
 static readonly char zsource_text[] = "$ZSOURCE";
 static readonly char zstatus_text[] = "$ZSTATUS";
 static readonly char zstep_text[] = "$ZSTEP";
+static readonly char zstrpllim_text[] = "$ZSTRPLLIM";
 static readonly char zsystem_text[] = "$ZSYSTEM";
 #ifdef GTM_TRIGGER
 static readonly char ztname_text[] = "$ZTNAME";
@@ -135,6 +136,7 @@ static readonly char ztwormhole_text[] = "$ZTWORMHOLE";
 #endif
 static readonly char zusedstor_text[] = "$ZUSEDSTOR";
 static readonly char zversion_text[] = "$ZVERSION";
+static readonly char zreldate_text[] = "$ZRELDATE";
 static readonly char zyerror_text[] = "$ZYERROR";
 static readonly char zonlnrlbk_text[] = "$ZONLNRLBK";
 static readonly char zclose_text[] = "$ZCLOSE";
@@ -148,18 +150,16 @@ GBLREF io_pair		io_curr_device;
 GBLREF io_pair		*io_std_device;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF io_log_name	*dollar_principal;
-GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_zgbldir;
 GBLREF mval		dollar_job;
 GBLREF uint4		dollar_zjob;
 GBLREF mval		dollar_zstatus;
-GBLREF mval		dollar_zstep;
 GBLREF mval		dollar_zsource;
 GBLREF int4		dollar_zsystem;
 GBLREF int4		dollar_zeditor;
 GBLREF uint4		dollar_tlevel;
 GBLREF uint4		dollar_trestart;
-GBLREF mval		dollar_etrap, dollar_estack_delta, dollar_zerror, dollar_zyerror, dollar_system;
+GBLREF mval		dollar_estack_delta, dollar_zerror, dollar_zyerror, dollar_system;
 GBLREF mval		dollar_zinterrupt, dollar_ztexit;
 GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
@@ -188,6 +188,8 @@ GBLREF mstr		dollar_zpout;
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
+LITREF char		gtm_release_stamp[];
+LITREF int4		gtm_release_stamp_len;
 
 #define ZWRITE_DOLLAR_PRINCIPAL(MVAL, X, TEXT, OUTPUT)					\
 {											\
@@ -275,7 +277,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 		/* CAUTION: fall through */
 		case SV_ETRAP:
 			var.mvtype = MV_STR;
-			var.str = dollar_etrap.str;
+			var.str = (TREF(dollar_etrap)).str;
 			ZS_VAR_EQU(&x, etrap_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
@@ -442,7 +444,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
-#		ifdef UNIX
 		case SV_ZCLOSE:
 			count = (int)(TREF(dollar_zclose));
 			MV_FORCE_MVAL(&var, count);
@@ -450,7 +451,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
-#		endif
 		/* CAUTION: fall through */
 		case SV_ZCMDLINE:
 			get_command_line(&var, TRUE);	/* TRUE indicates $ZCMDLINE (i.e. processed not actual command line) */
@@ -605,7 +605,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
-#		ifdef UNIX
 		case SV_ZONLNRLBK:
 			count = (int)(TREF(dollar_zonlnrlbk));
 			MV_FORCE_MVAL(&var, count);
@@ -613,7 +612,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
-#		endif
 		/* CAUTION: fall through */
 		case SV_ZPATNUMERIC:
 			var.mvtype = MV_STR;
@@ -627,10 +625,10 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (io_std_device->in != io_std_device->out)
 			{	/* ZPIN != ZPOUT print it */
 				ZWRITE_SPLIT_DOLLAR_P(var, zdir_error, ZDIR_ERR_LEN, x, dollar_zpin, principalin_text, output);
-			} else if (SV_ALL != one_sv)
+			} else
 			{	/* Print $principal for a ZWRite request if ZPIN == ZPOUT */
 				ZWRITE_DOLLAR_PRINCIPAL(var, x, principalin_text, output);
-			}	/* Else, ignore this for zshow when ZPIN == ZPOUT */
+			}
 			var.mvtype = 0;
 			if (SV_ALL != one_sv)
 				break;
@@ -646,17 +644,11 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (io_std_device->in != io_std_device->out)
 			{	/* ZPOUT != ZPIN print it */
 				ZWRITE_SPLIT_DOLLAR_P(var, zdir_error, ZDIR_ERR_LEN, x, dollar_zpout, principalout_text, output);
-			} else if (SV_ALL != one_sv)
+			} else
 			{	/* Print $principal for a ZWRite request if ZPOUT == ZPIN */
 				ZWRITE_DOLLAR_PRINCIPAL(var, x, principalout_text, output);
-			}	/* Else, ignore this for zshow when ZPOUT == ZPIN */
+			}
 			var.mvtype = 0;
-			if (SV_ALL != one_sv)
-				break;
-		/* CAUTION: fall through */
-		case SV_ZPROC:
-			ZS_VAR_EQU(&x, zproc_text);
-			mval_write(output, &dollar_zproc, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -680,6 +672,14 @@ void zshow_svn(zshow_out *output, int one_sv)
 			count = (int)totalRmalloc;	/* WARNING: downcasting possible 64bit value to 32bits */
 			MV_FORCE_UMVAL(&var, (unsigned int)count);
 			ZS_VAR_EQU(&x, zrealstor_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		case SV_ZRELDATE:
+			var.mvtype = MV_STR;
+			var.str.addr = (char *)gtm_release_stamp;
+			var.str.len = gtm_release_stamp_len;
+			ZS_VAR_EQU(&x, zreldate_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
@@ -708,7 +708,15 @@ void zshow_svn(zshow_out *output, int one_sv)
 		/* CAUTION: fall through */
 		case SV_ZSTEP:
 			ZS_VAR_EQU(&x, zstep_text);
-			mval_write(output, &dollar_zstep, TRUE);
+			mval_write(output, &(TREF(dollar_zstep)), TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZSTRPLLIM:
+			count = TREF(gtm_strpllim);
+			MV_FORCE_MVAL(&var, count);
+			ZS_VAR_EQU(&x, zstrpllim_text);
+			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -720,21 +728,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 #		ifdef GTM_TRIGGER
-		case SV_ZTCODE:		/* deprecated */
-		/* CAUTION: fall through */
-		case SV_ZTNAME:
-			if (NULL != dollar_ztname)
-			{
-				var.mvtype = MV_STR;
-				var.str.addr = dollar_ztname->addr;
-				var.str.len = dollar_ztname->len;
-			} else
-				memcpy(&var, &literal_null, SIZEOF(mval));
-			ZS_VAR_EQU(&x, ztname_text);
-			mval_write(output, &var, TRUE);
-			if (SV_ALL != one_sv)
-				break;
-		/* CAUTION: fall through */
 		case SV_ZTDATA:
 			if (NULL != dollar_ztdata)
 			{
@@ -776,6 +769,20 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
+		case SV_ZTNAME:
+		case SV_ZTCODE:		/* deprecated */
+			if (NULL != dollar_ztname)
+			{
+				var.mvtype = MV_STR;
+				var.str.addr = dollar_ztname->addr;
+				var.str.len = dollar_ztname->len;
+			} else
+				memcpy(&var, &literal_null, SIZEOF(mval));
+			ZS_VAR_EQU(&x, ztname_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
 		case SV_ZTOLDVAL:
 			if (NULL != dollar_ztoldval)
 			{
@@ -791,7 +798,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 		/* CAUTION: fall through */
 		case SV_ZTRAP:
 			var.mvtype = MV_STR;
-			var.str = dollar_ztrap.str;
+			var.str = (TREF(dollar_ztrap)).str;
 			ZS_VAR_EQU(&x, ztrap_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)

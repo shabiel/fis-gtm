@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,6 @@ GBLREF	boolean_t		jnlpool_init_needed;
 
 error_def(ERR_DBOPNERR);
 error_def(ERR_DBRDONLY);
-error_def(ERR_JNLFILOPN);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNODBNAME);
 error_def(ERR_NOREGION);
@@ -112,7 +111,7 @@ void mupip_extend(void)
 		assert((FILE_INFO(gv_cur_region))->grabbed_access_sem); /* we should have standalone access */
 	}
 #	endif
-	gvcst_init(gv_cur_region);
+	gvcst_init(gv_cur_region, NULL);
 	if (gv_cur_region->was_open)
 	{	/* This should not happen as extend works on only one region at a time, but handle for safety */
 		gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(4) ERR_DBOPNERR, 2, DB_LEN_STR(gv_cur_region));
@@ -121,9 +120,6 @@ void mupip_extend(void)
 	}
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 	cs_data = cs_addrs->hdr;
-#	if defined(__sun) || defined(__hpux)
-	cs_data->defer_allocate = TRUE;
-#	endif
 	defer_alloc = cs_data->defer_allocate;
 	if (cli_get_int("BLOCKS",&tblocks))
 	{	/* tblocks can be 0 if defer_alloc is FALSE because the goal is to fully allocate an existing database */
@@ -158,7 +154,7 @@ void mupip_extend(void)
 		case dba_bg:
 		case dba_mm:
 			grab_crit(gv_cur_region);
-			GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs, cs_data);
+			GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs);
 			old_total = cs_addrs->ti->total_blks;
 			if ((uint4)NO_FREE_SPACE == (status = GDSFILEXT(blocks, old_total, TRANS_IN_PROG_FALSE)))
 			{

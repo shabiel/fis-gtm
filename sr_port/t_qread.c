@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,6 +55,7 @@
 #include "process_reorg_encrypt_restart.h"
 #include "wcs_backoff.h"
 #include "wcs_wt.h"
+#include "wcs_recover.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -69,7 +70,6 @@ GBLREF	short			crash_count;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			process_id;
-GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
 GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		dse_running;
 GBLREF	boolean_t		disk_blk_read;
@@ -112,6 +112,17 @@ error_def(ERR_DBFILERR);
 error_def(ERR_DYNUPGRDFAIL);
 error_def(ERR_GVPUTFAIL);
 
+/**
+ * Returns pointer to the global buffer containing block blk.
+ *
+ * Checks to see if the block is already in a global buffer, or reads it from disk
+ *  if it is not.
+ *
+ * @param[in] blk The block id to read from disk
+ * @param[in] cycle Used to determine if the shared memory segment has updated since the last t_qread
+ * @param[out] cr_out The cache record which contains a pointer to the buffer (and other information) will be stored in *cr_out
+ * @return A pointer the location in shared memory which contains the database block
+ */
 sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out)
 	/* cycle is used in t_end to detect if the buffer has been refreshed since the t_qread */
 {
@@ -315,18 +326,15 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		 */
 		assert(!was_crit || (cnl->reorg_encrypt_cycle == encr_ptr->reorg_encrypt_cycle));
 		seg = gv_cur_region->dyn.addr;
-		issued_db_init_crypt_warning = encr_ptr->issued_db_init_crypt_warning;
+		/* Concurrent REORGs can induce crypt warnings. Only error out if reorg_encrypt_cycle matches */
+		issued_db_init_crypt_warning = ((cnl->reorg_encrypt_cycle == encr_ptr->reorg_encrypt_cycle) ?
+							encr_ptr->issued_db_init_crypt_warning : FALSE);
 		if (!IS_BITMAP_BLK(blk) && issued_db_init_crypt_warning)
 		{	/* A non-GT.M process is attempting to read a non-bitmap block, yet it has previously encountered an error
 			 * during db_init (because it did not have access to the encryption keys) and reported it with a -W-
 			 * severity. Since the block it is attempting to read can be in the unencrypted shared memory (read from
 			 * disk by another process with access to the encryption keys), we cannot let it access it without a valid
 			 * handle, so issue an rts_error.
-			 *
-			 * TODO: DSE and LKE could bypass getting the ftok semaphore. LKE is not an issue, but DSE does care about
-			 *       the csa->reorg_encrypt_cycle. So it means DSE could get an inconsistent copy of reorg_encrypt_cycle
-			 *       and associated hashes if it had done a bypass and a concurrent REORG -ENCRYPT is holding the ftok
-			 *       semaphore and changing these values at the same time.
 			 */
 			assert(!IS_GTM_IMAGE);	/* GT.M would have error'ed out in db_init */
 			gtmcrypt_errno = SET_REPEAT_MSG_MASK(SET_CRYPTERR_MASK(ERR_CRYPTBADCONFIG));
@@ -655,7 +663,24 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							return (sm_uc_ptr_t)NULL;
 						}
 						if (!wcs_phase2_commit_wait(csa, cr))
-						{	/* Timed out waiting for cr->in_tend to become non-zero. Restart. */
+						{	/* Timed out waiting for cr->in_tend to become non-zero. Restart.
+							 * But before that, if not holding crit, do a "wcs_recover" to fix
+							 * the problem before starting the next try. Check if "cr->in_tend"
+							 * is still non-zero after getting crit to avoid lots of unnecessary
+							 * calls to "wcs_recover".
+							 */
+							assert(was_crit == csa->now_crit);
+							if (!was_crit)
+							{
+								assert(!hold_onto_crit);
+								grab_crit_encr_cycle_sync(gv_cur_region);
+								if (blocking_pid == cr->in_tend)
+								{
+									wcs_recover(gv_cur_region);
+									assert(!cr->in_tend);
+								}
+								rel_crit(gv_cur_region);
+							}
 							rdfail_detail = cdb_sc_phase2waitfail;
 							return (sm_uc_ptr_t)NULL;
 						}
@@ -684,8 +709,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				break;
 			if (lcnt >= BUF_OWNER_STUCK && (0 == (lcnt % BUF_OWNER_STUCK)))
 			{
-				if (!csa->now_crit && !hold_onto_crit)
+				if (!csa->now_crit)
+				{
+					assert(!hold_onto_crit);
 					grab_crit_encr_cycle_sync(gv_cur_region);
+				}
 				if (cr->read_in_progress < -1)
 				{	/* outside of design; clear to known state */
 					BG_TRACE_PRO(t_qread_out_of_design);

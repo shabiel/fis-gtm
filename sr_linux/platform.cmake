@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2016 Fidelity National Information		#
+# Copyright (c) 2013-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -52,7 +52,7 @@ else()
   #   See http://stackoverflow.com/questions/21689124/mkstemp-and-fdopen-in-cygwin-1-7-28
   # Cygwin warns if you add -fPIC that the compiled code is already position
   # independent. So don't add -fPIC
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ansi -fPIC ")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC ")
 endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
 
@@ -69,6 +69,7 @@ set(gtm_link  "-Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus -Wl,--version-script
 set(gtm_dep   "${GTM_BINARY_DIR}/gtmexe_symbols.export")
 
 set(libgtmshr_link "-Wl,-u,gtm_ci -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_is_main_thread")
+set(libgtmshr_link "${libgtmshr_link} -Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong")
 set(libgtmshr_link "${libgtmshr_link} -Wl,--version-script,\"${GTM_BINARY_DIR}/gtmshr_symbols.export\"")
 set(libgtmshr_dep  "${GTM_BINARY_DIR}/gtmexe_symbols.export")
 

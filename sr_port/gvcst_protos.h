@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2017 Fidelity National Information	*
+ * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@ boolean_t	gvcst_gblmod(mval *v);
 boolean_t	gvcst_get(mval *v);
 boolean_t	gvcst_get2(mval *v, unsigned char *sn_ptr);
 void		gvcst_incr(mval *increment, mval *result);
-void		gvcst_init(gd_region *greg);
+void		gvcst_init(gd_region *greg, gd_addr *addr);
 void		gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init);
 void		gvcst_kill(boolean_t do_subtree);
 void		gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing_chunks);
@@ -74,8 +74,6 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val);
 	STATEMENT;					\
 }
 
-void		gvcst_statshare_optin(void);
-void		gvcst_statshare_optout(void);
 void		gvcst_tp_init(gd_region *);
 boolean_t	gvcst_zprevious(void);
 boolean_t	gvcst_zprevious2(void);

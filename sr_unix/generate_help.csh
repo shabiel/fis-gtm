@@ -17,7 +17,6 @@
 #   HLP file location (defaults to $gtm_pct)
 #   Error log file (used to redirect output to error file in comlist.csh)
 
-
 set hlpdir = $1
 if ("" == "${hlpdir}") then
 	if (0 == $?gtm_pct) then
@@ -56,6 +55,8 @@ foreach hlp (${hlpdir}/*.hlp)
 		continue
 	endif
 
+	echo "Generating ${prefix}help.gld and ${prefix}help.dat"
+
 	# Either help info does not exist or needs to be regenerated
 
 	# Define the global directory with the same prefix as the HLP file and
@@ -93,13 +94,15 @@ GTM_in_gtmhelp
 		continue
 	endif
 	if ("gtm" == "$prefix") then
-		$gtm_exe/mumps -run GTMDEFINEDTYPESTODB
+		${gtm_dist}/mumps -run GTMDEFINEDTYPESTODB
 		if ($status) then
 			@ script_stat++
 			echo "generatehelp-E-hlp, Error during GTMDEFINEDTYPESTODB ${hlp}" $errout
 			continue
 		endif
 	endif
+	echo "Setting read-only for ${gtm_dist}/${prefix}help.{gld,dat} regions"
+	${gtm_dist}/mupip set -read_only -acc=MM -reg "*" >& /dev/null
 	chmod ugo-x ${gtm_dist}/${prefix}help.{gld,dat}
 end
 

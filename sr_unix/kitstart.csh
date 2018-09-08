@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2017 Fidelity National Information		#
+# Copyright (c) 2011-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -183,7 +183,8 @@ endif
 
 version $version p  # Set the current version so that relative paths work
 cmsver $version	    # Set appropriate path to locate $version sources in CMS, the default is V990
-set releasever = `$gtm_dist/mumps -run %XCMD 'write $piece($zversion," ",2),!'`
+set zver = `$gtm_dist/mumps -run %XCMD 'write $zversion'`
+set releasever = $zver[2]
 
 # create a README.txt which has the current year in it
 setenv readme_txt ${gtm_com}/README.txt
@@ -238,6 +239,25 @@ foreach image ($imagetype)
 	cp ${cpflags} ${gtm_ver}/${image}/* . || exit 8
 	# Put pinentry into the plugin directory so that it ends up in the final package
 	cp ${gtm_pct}/pinentry.m ./plugin/gtmcrypt/
+	# Move debug symbols out of the way if they exist
+	set debug_symbol_dir = "${tmp_dist}/${image}_DBG/"
+	mkdir -p "$debug_symbol_dir"
+	if ( -f ${tmp_dist}/${image}/mumps.debug ) then
+		mv ${tmp_dist}/${image}/*.debug $debug_symbol_dir
+		pushd $debug_symbol_dir
+		set dist_file = "${dist}/${product}-debug_${version}_${osname}_${arch}_${image}.${package_ext}"
+		echo ""
+		echo "Packaging debug symbols to ${dist_file}"
+		cp $gtm_tools/install_debug_symbols_sh.txt install_debug_symbols.sh
+		chmod +x install_debug_symbols.sh
+		$package $dist_file *.debug install_debug_symbols.sh || exit 10
+		echo "Gzipping $dist_file"
+		gzip $dist_file || exit 11
+		# Move debug symbols out of the way before other packages get made
+		echo "Moving debug symbols to $debug_symbol_dir during kitstart"
+		popd
+
+	endif
 	echo ""
 	echo "Removing files that are not distributed (${notdistributed} ${mnotdistributed})"
 	/bin/rm -rf ${notdistributed} ${mnotdistributed} || exit 9
@@ -357,6 +377,37 @@ foreach image ($imagetype)
 	endif
 end
 echo ""
+
+if (-f $gtm_tools/gtmpcat.m) then
+	pushd $gtm_tools
+	set nonomatch ; set fldbld = (gtmpcat*On*${version}.m) ; unset nonomatch
+	if (("$fldbld" == "gtmpcat*On*${version}.m") || ($#fldbld > 1)) then
+		echo ""
+		echo "FAIL:missing or duplicate gtmpcat field build file ($fldbld)"
+	else
+		set dist_file = "${dist}/gtmpcat_for_${version}_${osname}_${arch}.${package_ext}"
+		echo ""
+		echo "Creating $dist_file"
+		sed "s/#ZVERSION#/${zver}/;s/#FLDBLD#/${fldbld}/" < install_gtmpcat_sh.txt > install_gtmpcat.sh
+		cat gtmpcat_sh.txt > gtmpcat.sh
+		chmod 500 install_gtmpcat.sh gtmpcat.sh
+		set prev_user = `filetest -U gtmpcat.m`
+		set prev_group = `filetest -G gtmpcat.m`
+		set prev_perm = `filetest -P: gtmpcat.m`
+		chown 0:0 gtmpcat.m $fldbld
+		chmod 400 gtmpcat.m $fldbld
+		$package $dist_file gtmpcat.m $fldbld install_gtmpcat.sh gtmpcat.sh || exit 10
+		chown ${prev_user}:${prev_group} gtmpcat.m $fldbld
+		chmod ${prev_perm} gtmpcat.m $fldbld
+		echo ""
+		echo "Gzipping $dist_file"
+		gzip $dist_file || exit 11
+	endif
+	popd
+else
+	echo ""
+	echo "FAIL:gtmpcat was not found"
+endif
 
 find $dist -type f -exec chmod 444 {} \;
 find $dist -type d -exec chmod 755 {} \;
@@ -546,6 +597,45 @@ CONFIGURE_EOF
 			set leavedir = 1
 		endif
 
+		# Install gtmpcat
+		pushd $gtm_tools
+		yes | env gtm_dist=${install}/defgroup/${image} sh ./install_gtmpcat.sh
+		yes | env gtm_dist=${install}/${image} sh ./install_gtmpcat.sh
+		popd
+
+		# Test gtmpcat
+		pushd /tmp
+		foreach dir (defgroup/${image} ${image})
+			set gtmpcatout = "${install}/$dir/invoke_gtmpcat.out"
+			set gtmcshrc = "$install/$dir/gtmcshrc"
+			(source $gtmcshrc ; $gtm_dist/mumps -r %XCMD 'zsystem "$gtm_dist/gtmpcat "_$job') |& tee $gtmpcatout
+			grep -q 'GTMPCAT Complete' $gtmpcatout
+			if (0 == $status) then
+				echo "Test of installation of gtmpcat ${version}/$dir PASSED"
+			else
+				echo "Test of installation of gtmpcat ${version}/$dir FAILED"
+			endif
+		end
+
+		popd
+
+		# install debug symbols
+		if ( ( "`uname`" == "Linux" ) && ("pro" == "$image") ) then
+			pushd ${tmp_dist}/${image}_DBG/
+			yes | env gtm_dist=${install}/${image} sh ./install_debug_symbols.sh
+			popd
+
+			# Test debug symbols
+			set result=`source ${install}/${image}/gtmcshrc ; gdb $gtm_dist/mumps -ex quit | grep mumps.debug | wc -l`
+			echo ""
+			echo ""
+			if ( $result ) then
+				echo "Test of installation of debug symbols ${version}/${image} PASSED"
+			else
+				echo "Test of installation of debug symbols ${version}/${image} FAILED"
+			endif
+		endif
+
 	end
 endif
 
@@ -557,6 +647,7 @@ if (! $leavedir) then
 	echo ""
 	echo ""
 	/bin/rm -rf ${tmp_dist} ${install}
+	/bin/rm -f $gtm_tools/{gtmpcat.sh,install_gtmpcat.sh}
 	exit 0
 endif
 

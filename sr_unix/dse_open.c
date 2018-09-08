@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,18 +46,21 @@
 #pragma pointer_size (long)
 #endif
 
-GBLREF int	(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF int	(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF spdesc stringpool;
 GBLREF gtm_chset_t	dse_over_chset;
+
+LITREF	mval		literal_zero;
 
 #ifdef	__osf__
 #pragma pointer_size (restore)
 #endif
 
+#define		PATCH_FILE_MAX 255
 static int	patch_fd;
-static char	patch_ofile[256];
+static char	patch_ofile[PATCH_FILE_MAX + 1];
 static short	patch_len;
-static char	ch_set_name[MAX_CHSET_NAME];
+static char	ch_set_name[MAX_CHSET_NAME + 1];
 
 GBLREF enum dse_fmt	dse_dmp_format;
 
@@ -99,7 +103,7 @@ void	dse_open (void)
 			util_out_print("Current output file:  !AD", TRUE, strlen(patch_ofile), &patch_ofile[0]);
 			return;
 		}
-		cli_len = SIZEOF(patch_ofile);
+		cli_len = PATCH_FILE_MAX;
 		if (!cli_get_str("FILE", patch_ofile, &cli_len))
 			return;
 		if (0 == cli_len)
@@ -116,7 +120,7 @@ void	dse_open (void)
 		open_pars.mvtype = MV_STR;
 		open_pars.str.len = SIZEOF(open_params_list);
 		open_pars.str.addr = (char *)open_params_list;
-		(*op_open_ptr)(&val, &open_pars, 0, NULL);
+		(*op_open_ptr)(&val, &open_pars, (mval *)&literal_zero, NULL);
 		use_pars.mvtype = MV_STR;
 		use_pars.str.len = SIZEOF(use_params_list);
 		use_pars.str.addr = (char *)use_params_list;
@@ -124,7 +128,7 @@ void	dse_open (void)
 
 		if (CLI_PRESENT == cli_present("OCHSET"))
 		{
-			cli_len = SIZEOF(ch_set_name);
+			cli_len = MAX_CHSET_NAME;
 			if (cli_get_str("OCHSET", ch_set_name, &cli_len))
 			{
 				if (0 == cli_len)
@@ -133,7 +137,7 @@ void	dse_open (void)
 					return;
 				}
 #ifdef KEEP_zOS_EBCDIC
-                      		ch_set_name[cli_len] = 0;
+                      		ch_set_name[cli_len] = '\0';
                                 ch_set_len = cli_len;
                                 if ( (iconv_t)0 != dse_over_cvtcd )
                                 {
@@ -181,6 +185,7 @@ boolean_t dse_fdmp_output (void *addr, int4 len)
 	}
 	if (len)
 	{
+		assert(buffer); /* 4SCA: Even though len acts as a guard */
 		memcpy(buffer, addr, len);
 		buffer[len] = 0;
 		val.mvtype = MV_STR;

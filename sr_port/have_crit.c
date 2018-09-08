@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,12 +31,13 @@
 #include "send_msg.h"
 
 GBLREF volatile int4		crit_count;
-GBLREF jnlpool_addrs		jnlpool;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
+GBLREF jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF uint4			process_id;
 GBLREF uint4			crit_deadlock_check_cycle;
 GBLREF uint4			dollar_tlevel;
 GBLREF unsigned int		t_tries;
-#if defined(UNIX) && defined(DEBUG)
+#ifdef DEBUG
 GBLREF jnl_gbls_t		jgbl;
 #endif
 
@@ -54,19 +55,20 @@ error_def(ERR_MUTEXRELEASED);
  */
 uint4 have_crit(uint4 crit_state)
 {
-	gd_region	*r_top, *r_local;
-	gd_addr		*addr_ptr;
-	sgmnt_addrs	*csa;
-	uint4		crit_reg_cnt = 0;
+	gd_region		*r_top, *r_local;
+	gd_addr			*addr_ptr;
+	jnlpool_addrs_ptr_t	local_jnlpool;
+	sgmnt_addrs		*csa;
+	uint4			crit_reg_cnt = 0;
+	DEBUG_ONLY(uint4	crit_jnlpool_reg = 0;)
 
 	/* in order to proper release the necessary regions, CRIT_RELEASE implies going through all the regions */
 	if (crit_state & CRIT_RELEASE)
 	{
-		UNIX_ONLY(assert(!jgbl.onlnrlbk)); /* should not request crit to be released if online rollback */
-		assert(0 == crit_count);	/* Make sure we dont return right away in the next "if" block in case of release */
+		assert(!jgbl.onlnrlbk);		/* should not request crit to be released if online rollback */
 		crit_state |= CRIT_ALL_REGIONS;
 	}
-	if ((0 != crit_count) && (crit_state & CRIT_HAVE_ANY_REG))
+	if ((INTRPT_IN_CRIT_FUNCTION == intrpt_ok_state) && (crit_state & CRIT_HAVE_ANY_REG))
 	{
 		crit_reg_cnt++;
 		if (0 == (crit_state & CRIT_ALL_REGIONS))
@@ -129,18 +131,23 @@ uint4 have_crit(uint4 crit_state)
 			}
 		}
 	}
-	if (NULL != jnlpool.jnlpool_ctl)
-	{
-		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
-		if ((NULL != csa) && csa->now_crit && (crit_state & CRIT_HAVE_ANY_REG))
+	for (local_jnlpool = jnlpool_head; local_jnlpool; local_jnlpool = local_jnlpool->next)
+		if ((NULL != local_jnlpool) && (NULL != local_jnlpool->jnlpool_ctl))
 		{
-			crit_reg_cnt++;
-			if (0 != (crit_state & CRIT_RELEASE))
+			csa = &FILE_INFO(local_jnlpool->jnlpool_dummy_reg)->s_addrs;
+			if ((NULL != csa) && csa->now_crit && (crit_state & CRIT_HAVE_ANY_REG))
 			{
-				assert(!csa->hold_onto_crit);
-				rel_lock(jnlpool.jnlpool_dummy_reg);
+				crit_reg_cnt++;
+#				ifdef DEBUG
+				crit_jnlpool_reg++;
+				assert(1 >= crit_jnlpool_reg);
+#				endif
+				if (0 != (crit_state & CRIT_RELEASE))
+				{
+					assert(!csa->hold_onto_crit);
+					rel_lock(local_jnlpool->jnlpool_dummy_reg);
+				}
 			}
 		}
-	}
 	return crit_reg_cnt;
 }

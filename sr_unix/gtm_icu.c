@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -162,9 +162,9 @@ static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char *icusymv
 	int4		major_ver, minor_ver;
 	int		i;
 
-	if (NULL == icu_ver_buf)
+	if ((NULL == icu_ver_buf) || (0 == len))
 		return FALSE;	/* empty string */
-	
+
 	/* Deconstruct the two known forms of gtm_icu_version "[0-9].[0-9]" and "[0-9][0-9]" ignoring trailing values */
 	ptr = icu_ver_buf;
 	if (-1 == (major_ver = asc2i((uchar_ptr_t)ptr++, 1)))
@@ -231,7 +231,9 @@ void gtm_icu_init(void)
 #	endif
 	locale = setlocale(LC_CTYPE, "");
 	chset = nl_langinfo(CODESET);
-	if ((NULL == locale) || (NULL == chset) || ((0 != strcasecmp(chset, "utf-8")) && (0 != strcasecmp(chset, "utf8"))))
+	if (NULL == chset)	/* 4SCA : null return nl_langinfo not possible */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_LIT("<undefined>"));
+	if ((NULL == locale) || (0 != strcasecmp(chset, "utf-8")) && (0 != strcasecmp(chset, "utf8")))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_STR(chset));
 	/* By default, GT.M will henceforth expect that ICU has been built with symbol renaming disabled. If that is not the case,
 	 * GT.M can be notified of this through an environment variable (macro GTM_ICU_VERSION).  The variable should contain the
@@ -325,7 +327,8 @@ void gtm_icu_init(void)
 			buflen = 0;
 			/* real_path = /usr/local/lib64/libicuio36.0.a */
 			ptr = basename(real_path);
-			SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s", real_path, ptr); /* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
+			/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
+			SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s", real_path, ptr);
 			buflen += (STRLEN(real_path) + STRLEN(ptr) + 1);
 			ptr = strrchr(buf, '.');
 			strcpy(ptr, ".so)");			/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.so) */

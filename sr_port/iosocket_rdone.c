@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,15 +22,15 @@
 
 GBLREF io_pair	io_curr_device;
 
-int	iosocket_rdone(mint *v, int4 timeout)
+int	iosocket_rdone(mint *v, int4 msec_timeout)
 {
-	mval		tmp;
-	int		ret;
-	uint4		codepoint;
-	io_desc		*iod;
 	gtm_chset_t	ichset;
+	int		ret;
+	io_desc		*iod;
+	mval		tmp;
+	uint4		codepoint;
 
-	ret = iosocket_readfl(&tmp, 1, timeout);
+	ret = iosocket_readfl(&tmp, 1, msec_timeout);
 	if (ret)
 	{
 		if (0 < tmp.str.len)
@@ -41,13 +42,9 @@ int	iosocket_rdone(mint *v, int4 timeout)
 					codepoint = (unsigned char)tmp.str.addr[0];
 					break;
 				case CHSET_UTF8:
-					UTF8_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
-					break;
 				case CHSET_UTF16BE:
-					UTF16BE_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
-					break;
 				case CHSET_UTF16LE:
-					UTF16LE_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
+					UTF8_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
 					break;
 				default:
 					assertpro(ichset != ichset);

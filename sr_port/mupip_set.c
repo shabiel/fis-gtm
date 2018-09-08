@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@ error_def(ERR_MUNODBNAME);
 void mupip_set(void)
 {
 	boolean_t	file, jnlfile;
-	char		db_fn[MAX_FN_LEN + 1], jnl_fn[JNL_NAME_SIZE];
+	char		db_fn[MAX_FN_LEN + 1], jnl_fn[JNL_NAME_SIZE + 1];
 	unsigned short	db_fn_len, jnl_fn_len;
 	uint4		status;
 	int 		cli_stat;
@@ -71,10 +71,10 @@ void mupip_set(void)
 	} else
 	{
 		assert(jnlfile);
-		jnl_fn_len = SIZEOF(jnl_fn);
-		memset(jnl_fn, 0, jnl_fn_len);
+		jnl_fn_len = JNL_NAME_SIZE;
 		if (!cli_get_str("WHAT", jnl_fn, &jnl_fn_len))
 			mupip_exit(ERR_MUNOACTION);
+		jnl_fn[jnl_fn_len] = '\0';
 		status = mupip_set_jnlfile(jnl_fn, SIZEOF(jnl_fn));
 		mupip_exit(status);
 	}
@@ -92,6 +92,7 @@ void mupip_set(void)
 		|| (CLI_PRESENT == cli_present("EXTENSION_COUNT"))
 		|| (CLI_PRESENT == cli_present("FLUSH_TIME"))
 		|| (CLI_PRESENT == cli_present("GLOBAL_BUFFERS"))
+		|| (CLI_PRESENT == cli_present("HARD_SPIN_COUNT"))
 		|| (CLI_NEGATED == cli_present("INST_FREEZE_ON_ERROR"))
 		|| (CLI_PRESENT == cli_present("INST_FREEZE_ON_ERROR"))
 		|| (CLI_PRESENT == cli_present("KEY_SIZE"))
@@ -99,15 +100,20 @@ void mupip_set(void)
 		|| (CLI_NEGATED == cli_present("LCK_SHARES_DB_CRIT"))
 		|| (CLI_PRESENT == cli_present("LOCK_SPACE"))
 		|| (CLI_PRESENT == cli_present("MUTEX_SLOTS"))
+		|| (CLI_PRESENT == cli_present("NULL_SUBSCRIPTS"))
 		|| (CLI_PRESENT == cli_present("PARTIAL_RECOV_BYPASS"))
 		|| (CLI_NEGATED == cli_present("QDBRUNDOWN"))
 		|| (CLI_PRESENT == cli_present("QDBRUNDOWN"))
+		|| (CLI_PRESENT == cli_present("READ_ONLY"))
+		|| (CLI_NEGATED == cli_present("READ_ONLY"))
 		|| (CLI_PRESENT == cli_present("RECORD_SIZE"))
 		|| (CLI_PRESENT == cli_present("RESERVED_BYTES"))
 		|| (CLI_PRESENT == cli_present("SLEEP_SPIN_COUNT"))
-		|| (CLI_PRESENT == cli_present("SPIN_SLEEP_LIMIT"))
+		|| (CLI_PRESENT == cli_present("SPIN_SLEEP_MASK"))
 		|| (CLI_NEGATED == cli_present("STATS"))
 		|| (CLI_PRESENT == cli_present("STATS"))
+		|| (CLI_PRESENT == cli_present("STDNULLCOLL"))
+		|| (CLI_NEGATED == cli_present("STDNULLCOLL"))
 		|| (CLI_PRESENT == cli_present("VERSION"))
 		|| (CLI_PRESENT == cli_present("WAIT_DISK")))
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,8 +64,9 @@
 #include "gtmcrypt.h"
 #include "is_proc_alive.h"
 #include "gtm_reservedDB.h"
+#include "min_max.h"
 
-GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
 GBLREF	gd_region		*gv_cur_region;
@@ -84,6 +85,7 @@ error_def(ERR_EXTRACTFILERR);
 error_def(ERR_ENCRYPTCONFLT);
 error_def(ERR_EXTRFILEXISTS);
 error_def(ERR_EXTRINTEGRITY);
+error_def(ERR_ICUNOTENABLED);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
@@ -94,6 +96,7 @@ error_def(ERR_TEXT);
 
 LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(BIN_HEADER_DATEFMT) - 1,
 						      BIN_HEADER_DATEFMT, 0, 0);
+LITREF	mval	literal_zero;
 
 LITREF mstr	chset_names[];
 
@@ -197,7 +200,7 @@ void mu_extract(void)
 	int				reg_max_rec, reg_max_key, reg_max_blk, reg_std_null_coll;
 	int				iter, format, local_errno, int_nlen;
 	boolean_t			freeze, override, logqualifier, success, success2;
-	char				format_buffer[FORMAT_STR_MAX_SIZE],  ch_set_name[MAX_CHSET_NAME], cli_buff[MAX_LINE],
+	char				format_buffer[FORMAT_STR_MAX_SIZE],  ch_set_name[MAX_CHSET_NAME + 1], cli_buff[MAX_LINE],
 					label_buff[LABEL_STR_MAX_SIZE];
 	glist				gl_head, *gl_ptr, *next_gl_ptr;
 	gd_region			*reg, *region_top;
@@ -238,25 +241,30 @@ void mu_extract(void)
 	mu_outofband_setup();
 	if (CLI_PRESENT == cli_present("OCHSET"))
 	{
-		ch_set_len = SIZEOF(ch_set_name);
-		if (cli_get_str("OCHSET", ch_set_name, &ch_set_len))
+		if (gtm_utf8_mode)
 		{
-			if (0 == ch_set_len)
-				mupip_exit(ERR_MUNOACTION);	/* need to change to OPCHSET error when added */
-			ch_set_name[ch_set_len] = '\0';
-#			ifdef KEEP_zOS_EBCDIC
-   			if ( (iconv_t)0 != active_device->output_conv_cd)
-   			        ICONV_CLOSE_CD(active_device->output_conv_cd);
-   			if (DEFAULT_CODE_SET != active_device->out_code_set)
-   				ICONV_OPEN_CD(active_device->output_conv_cd, INSIDE_CH_SET, ch_set_name);
-#			else
-			chset_mstr.addr = ch_set_name;
-			chset_mstr.len = ch_set_len;
-			SET_ENCODING(active_device->ochset, &chset_mstr);
-			get_chset_desc(&chset_names[active_device->ochset]);
+			ch_set_len = MAX_CHSET_NAME;
+			if (cli_get_str("OCHSET", ch_set_name, &ch_set_len))
+			{
+				if (0 == ch_set_len)
+					mupip_exit(ERR_MUNOACTION);	/* need to change to OCHSET error when added */
+				ch_set_name[ch_set_len] = '\0';
+#				ifdef KEEP_zOS_EBCDIC
+				if ( (iconv_t)0 != active_device->output_conv_cd)
+					ICONV_CLOSE_CD(active_device->output_conv_cd);
+				if (DEFAULT_CODE_SET != active_device->out_code_set)
+					ICONV_OPEN_CD(active_device->output_conv_cd, INSIDE_CH_SET, ch_set_name);
+#				else
+				chset_mstr.addr = ch_set_name;
+				chset_mstr.len = ch_set_len;
+				SET_ENCODING(active_device->ochset, &chset_mstr);
+				get_chset_desc(&chset_names[active_device->ochset]);
 #			endif
-			ochset_set = TRUE;
-		}
+				ochset_set = TRUE;
+			}
+		} else
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ICUNOTENABLED, 0, ERR_TEXT, 2,
+						LEN_AND_LIT("Cannot use the -OCHSET qualifier. Continuing without it."));
 	}
 	region = FALSE;
 	if (CLI_PRESENT == cli_present("REGION"))
@@ -289,9 +297,9 @@ void mu_extract(void)
 	}
 	int_nlen = n_len;
 	lower_to_upper((uchar_ptr_t)format_buffer, (uchar_ptr_t)format_buffer, int_nlen);
-	if (0 == memcmp(format_buffer, ZWR_FORMAT_STRING, n_len))
+	if (0 == STRNCMP_LIT_LEN(format_buffer, ZWR_FORMAT_STRING, n_len))
 	        format = MU_FMT_ZWR;
-	else if (0 == memcmp(format_buffer, GO_FORMAT_STRING, n_len))
+	else if (0 == STRNCMP_LIT_LEN(format_buffer, GO_FORMAT_STRING, n_len))
 	{
 		if (gtm_utf8_mode)
 		{
@@ -299,7 +307,7 @@ void mu_extract(void)
 			mupip_exit(ERR_MUPCLIERR);
 		}
 		format = MU_FMT_GO;
-	} else if (0 == memcmp(format_buffer, BINARY_FORMAT_STRING, n_len))
+	} else if (0 == STRNCMP_LIT_LEN(format_buffer, BINARY_FORMAT_STRING, n_len))
 	{
 		format = MU_FMT_BINARY;
 		is_binary_format = TRUE;
@@ -435,7 +443,7 @@ void mu_extract(void)
 	op_pars.str.len = SIZEOF(open_params_list);
 	op_pars.str.addr = (char *)open_params_list;
 	op_val.mvtype = MV_STR;
-	(*op_open_ptr)(&op_val, &op_pars, 0, 0);
+	(*op_open_ptr)(&op_val, &op_pars, (mval *)&literal_zero, 0);
 	ESTABLISH(mu_extract_handler1);
 	op_pars.str.len = SIZEOF(use_params);
 	op_pars.str.addr = (char *)&use_params;

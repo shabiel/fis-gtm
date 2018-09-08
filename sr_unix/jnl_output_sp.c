@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,9 +38,10 @@
 #include "gtm_dbjnl_dupfd_check.h"
 #include "anticipatory_freeze.h"
 
-GBLREF	volatile int4	db_fsync_in_prog;
-GBLREF	volatile int4	jnl_qio_in_prog;
-GBLREF	uint4		process_id;
+GBLREF	volatile int4		db_fsync_in_prog;
+GBLREF	volatile int4		jnl_qio_in_prog;
+GBLREF	uint4			process_id;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_DBFSYNCERR);
 error_def(ERR_ENOSPCQIODEFER);
@@ -69,11 +70,13 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	unsigned int		status;
 	int			save_errno;
 	uint4			aligned_dskaddr, dskaddr;
+	uint4			jnl_wrt_start_mask;
 	int4			aligned_dsk, dsk;
 	int			aligned_tsz;
 	sm_uc_ptr_t		aligned_base;
-	uint4			jnl_fs_block_size;
+	uint4			jnl_fs_block_size, new_dsk, new_dskaddr;
 	gd_region		*reg;
+	intrpt_state_t		prev_intrpt_state;
 
 	assert(NULL != jpc);
 	reg = jpc->region;
@@ -82,11 +85,16 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	jb = jpc->jnl_buff;
 	if (jb->io_in_prog_latch.u.parts.latch_pid == process_id)	/* We already have the lock? */
 		return ERR_JNLWRTNOWWRTR;			/* timer driven io in progress */
-	jnl_qio_in_prog++;
+	DEFER_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 	if (!GET_SWAPLOCK(&jb->io_in_prog_latch))
 	{
-		jnl_qio_in_prog--;
-		assert(0 <= jnl_qio_in_prog);
+		ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
+		return ERR_JNLWRTDEFER;
+	}
+	if (IS_REPL_INST_FROZEN)
+	{
+		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
+		ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 		return ERR_JNLWRTDEFER;
 	}
 #	ifdef DEBUG
@@ -101,9 +109,9 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 #	endif
 	if (jb->dsk != (jb->dskaddr % jb->size))
 	{
+		assert(gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number));
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-		jnl_qio_in_prog--;
-		assert(0 <= jnl_qio_in_prog);
+		ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 		return ERR_JNLCNTRL;
 	}
 	if (!JNL_FILE_SWITCHED(jpc))
@@ -112,8 +120,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	{	/* journal file has been switched; release io_in_prog lock and return */
 		jpc->fd_mismatch = TRUE;
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-		jnl_qio_in_prog--;
-		assert(0 <= jnl_qio_in_prog);
+		ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 		return SS_NORMAL;
 	}
 	/* Currently we overload io_in_prog_latch to perform the db fsync too. Anyone trying to do a
@@ -129,8 +136,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		if (0 != save_errno)
 		{
 			RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-			jnl_qio_in_prog--;
-			assert(0 <= jnl_qio_in_prog);
+			ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 			/* DBFSYNCERR can potentially cause syslog flooding. Remove the following line if we it becomes an issue. */
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
@@ -141,7 +147,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	}
 	free_ptr = jb->free;
         /* The following barrier is to make sure that for the value of "free" that we extract (which may be
-         * slightly stale but that is not a correctness issue) we make sure we dont write out a stale version of
+         * slightly stale but that is not a correctness issue) we make sure we don't write out a stale version of
          * the journal buffer contents. While it is possible that we see journal buffer contents that are more
          * uptodate than "free", this would only mean writing out a less than optimal number of bytes but again,
          * not a correctness issue. Secondary effect is that it also enforces a corresponding non-stale value of
@@ -152,6 +158,33 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	dskaddr = jb->dskaddr;
 	was_wrapped = (free_ptr < dsk);
 	jnl_fs_block_size = jb->fs_block_size;
+	base = &jb->buff[dsk + jb->buff_off];
+	aligned_base = (sm_uc_ptr_t)ROUND_DOWN2((uintszofptr_t)base, jnl_fs_block_size);
+	assert(aligned_base >= &jb->buff[jb->buff_off]);
+	aligned_dskaddr = ROUND_DOWN2(dskaddr, jnl_fs_block_size);
+	if (jb->re_read_dskaddr)
+	{	/* Need to re-read the filesystem-block-size-aligned partial block before jb->dskaddr */
+		assert(jb->re_read_dskaddr == dskaddr);
+		tsz = dskaddr - aligned_dskaddr;
+		if (tsz)
+		{
+			/* Assert that both ends of the source buffer for the read falls within journal buffer limits */
+			assert(aligned_base >= &jb->buff[jb->buff_off]);
+			assert(aligned_base + tsz <= &jb->buff[jb->buff_off + jb->size]);
+			LSEEKREAD(jpc->channel, aligned_dskaddr, aligned_base, tsz, jpc->status);
+			if (SS_NORMAL != jpc->status)
+			{
+				RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
+				ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
+				jpc->status2 = SS_NORMAL;
+				jnl_send_oper(jpc, ERR_JNLRDERR);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csa->hdr), jpc->status);
+				assert(FALSE);	/* should not come here as the rts_error above should not return */
+				return ERR_JNLRDERR; /* ensure we do not fall through to code below as we no longer have the lock */
+			}
+		}
+		jb->re_read_dskaddr = 0;
+	}
 	if (aligned_write)
 		free_ptr = ROUND_DOWN2(free_ptr, jnl_fs_block_size);
 	assert(!(jb->size % jnl_fs_block_size));
@@ -162,14 +195,12 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	assert(dskaddr + tsz <= jb->freeaddr);
 	status = SS_NORMAL;
 	if (tsz)
-	{	/* ensure that dsk and free are never equal and we have left space for JNL_WRT_START_MASK */
+	{	/* ensure that dsk and free are never equal and we have left space for filesystem-aligned offset BEFORE dsk */
 		assert(SS_NORMAL == status);
-		assert((free_ptr > dsk) || (free_ptr < (dsk & JNL_WRT_START_MASK(jb)))
-			|| (dsk != (dsk & JNL_WRT_START_MASK(jb))));
+		DEBUG_ONLY(jnl_wrt_start_mask = ~(jb->fs_block_size - 1);)
+		assert((free_ptr > dsk) || (free_ptr < (dsk & jnl_wrt_start_mask)) || (dsk != (dsk & jnl_wrt_start_mask)));
 		jb->wrtsize = tsz;
 		jb->qiocnt++;
-		base = &jb->buff[dsk + jb->buff_off];
-		assert((base + tsz) <= (jb->buff + jb->size + jnl_fs_block_size));
 		assert(NOJNL != jpc->channel);
 		/* If sync_io is turned on, we would have turned on the O_DIRECT flag on some platforms. That will
 		 * require us to do aligned writes. Both the source buffer and the size of the write need to be aligned
@@ -184,10 +215,8 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		 * last valid record. This is considered okay as journal recovery has logic to scan past the garbage and
 		 * locate the last valid record in case of a crash before writing the EOF.
 		 */
-		aligned_dsk = ROUND_DOWN2(dsk, jnl_fs_block_size);
-		aligned_dskaddr = ROUND_DOWN2(dskaddr, jnl_fs_block_size);
+		DEBUG_ONLY(aligned_dsk = ROUND_DOWN2(dsk, jnl_fs_block_size));
 		aligned_tsz = ROUND_UP2((tsz + (dskaddr - aligned_dskaddr)), jnl_fs_block_size);
-		aligned_base = (sm_uc_ptr_t)ROUND_DOWN2((uintszofptr_t)base, jnl_fs_block_size);
 		/* Assert that aligned_dsk never backs up to a point BEFORE where the free pointer is */
 		assert((aligned_dsk > free_ptr) || (dsk <= free_ptr));
 		/* Assert that aligned_dskaddr never backs up to a point inside journal file header territory.
@@ -205,19 +234,20 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		{	/* update jnl_buff pointers to reflect the successful write to the journal file */
 			assert(dsk <= jb->size);
 			assert(jb->io_in_prog_latch.u.parts.latch_pid == process_id);
-			jpc->new_dsk = dsk + tsz;
-			if (jpc->new_dsk >= jb->size)
+			new_dskaddr = dskaddr + tsz;
+			new_dsk = dsk + tsz;
+			if (new_dsk >= jb->size)
 			{
-				assert(jpc->new_dsk == jb->size);
-				jpc->new_dsk = 0;
+				assert(new_dsk == jb->size);
+				new_dsk = 0;
 			}
-			jpc->new_dskaddr = dskaddr + tsz;
-			assert(jpc->new_dsk == jpc->new_dskaddr % jb->size);
-			assert(jb->freeaddr >= jpc->new_dskaddr);
-			jpc->dsk_update_inprog = TRUE;	/* for secshr_db_clnup to clean it up (when it becomes feasible in Unix) */
-			jb->dsk = jpc->new_dsk;
-			jb->dskaddr = jpc->new_dskaddr;
-			jpc->dsk_update_inprog = FALSE;
+			assert(new_dsk == new_dskaddr % jb->size);
+			assert(jb->freeaddr >= new_dskaddr);
+			/* Note: "wcs_flu" does a "performCASLatchCheck" of jb->io_in_prog_latch and relies
+			 * on "jb->dskaddr" being updated BEFORE "jb->dsk".
+			 */
+			jb->dskaddr = new_dskaddr;
+			jb->dsk = new_dsk;
 			cnl = csa->nl;
 			INCR_GVSTATS_COUNTER(csa, cnl, n_jfile_bytes, aligned_tsz);
 			INCR_GVSTATS_COUNTER(csa, cnl, n_jfile_writes, 1);
@@ -264,8 +294,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		JNL_FD_CLOSE(jpc->channel, close_res);	/* sets jpc->channel to NOJNL */
 		jpc->pini_addr = 0;
 	}
-	jnl_qio_in_prog--;
-	assert(0 <= jnl_qio_in_prog);
+	ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 	return status;
 }
 
@@ -283,6 +312,7 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	sgmnt_addrs		*csa;
 	unix_db_info		*udi;
 	uint4			jnl_fs_block_size;
+	int			index1;
 
 	assert(NULL != jpc);
 	udi = FILE_INFO(jpc->region);
@@ -292,6 +322,13 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	 * and the next block of code (after the yield()) processes the tail end of the data (if necessary)
 	 */
 	lcl_dskaddr = jb->dskaddr;
+	/* Check if there are any pending jnl phase2 commits that can be cleaned up. That will bring jb->freeaddr more uptodate. */
+	index1 = jb->phase2_commit_index1;
+	ASSERT_JNL_PHASE2_COMMIT_INDEX_IS_VALID(index1, JNL_PHASE2_COMMIT_ARRAY_SIZE);
+	if ((index1 != jb->phase2_commit_index2) && jb->phase2_commit_array[index1].write_complete
+				&& (LOCK_AVAILABLE == jb->phase2_commit_latch.u.parts.latch_pid))
+		jnl_phase2_cleanup(csa, jb);
+	/* Now that any possible phase2 commit cleanup is done, go ahead with qio (if needed) using updated jb->freeaddr */
 	target_freeaddr = jb->freeaddr;
 	if (lcl_dskaddr >= target_freeaddr)
 		return SS_NORMAL;

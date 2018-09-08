@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2016 Fidelity National Information	*
+ * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -254,6 +254,8 @@ int main()
 				 */
 				save_errno = errno;
 #				if DEBUG
+				/* Since we may have come here via the white box tests, let's ensure gtm_TZ_found is FALSE */
+				gtm_TZ_found = FALSE;
 				/* Separately test for some white box conditions before testing the real return codes */
 				if (WBTEST_ENABLED(WBTEST_SECSHRWRAP_NOTZREC_READERR))
 					SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRTZFAIL, "FGETS() failure reading /etc/environment "
@@ -345,13 +347,7 @@ int main()
 	}
 	if (!ret)
 	{	/* clear all */
-#		if defined(SUNOS) || defined (__CYGWIN__) /* Fixed by OSE/SMH - environ = NULL causes failures later*/
-		char *clearenv = NULL;
-		environ = &clearenv;
-          	status = 0;
-#		else
 		status = clearenv();
-#		endif
 		if (status)
 		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRCLEARENVFAILED);

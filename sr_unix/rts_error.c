@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,8 +38,8 @@ GBLREF	boolean_t	dont_want_core;
 GBLREF	boolean_t	run_time;
 GBLREF	char		cg_phase;
 GBLREF	gd_region	*gv_cur_region;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int		gtm_errno;
-GBLREF	jnlpool_addrs	jnlpool;
 GBLREF	void		(*stx_error_va_fptr)(int in_error, ...);	/* Function pointer for stx_error_va() so this can avoid
 								 	 * pulling stx_error() into gtmsecshr.
 								 	 */
@@ -64,19 +64,21 @@ int rts_error_va(void *csa, int argcnt, va_list var);
  *  =======	zero MUST be specified if there are no parameters.
  * ----------------------------------------------------------------------------------------
  */
-
+/* coverity[+kill] */
 int rts_error(int argcnt, ...)
 {
 	va_list		var;
 	sgmnt_addrs	*csa;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by PTHREAD_CSA_FROM_GV_CUR_REGION */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = PTHREAD_CSA_FROM_GV_CUR_REGION;
+	PTHREAD_CSA_FROM_GV_CUR_REGION(csa, local_jnlpool);
 	VAR_START(var, argcnt);
 	return rts_error_va(csa, argcnt, var);
 }
 
+/* coverity[+kill] */
 int rts_error_csa(void *csa, int argcnt, ...)
 {
 	va_list		var;
@@ -136,7 +138,7 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 		if (IS_GTMSECSHR_IMAGE)
 			util_out_print(NULL, RESET);
 		SET_ERROR_CONDITION(msgid);	/* sets "error_condition" & "severity" */
-		if (!run_time && (CGP_PARSE == cg_phase))
+		if (!run_time && (CGP_PARSE == cg_phase) && !DUMP)
 		{
 			(*stx_error_va_fptr)(msgid, var_dup);
 			TREF(director_token) = TK_ERROR;

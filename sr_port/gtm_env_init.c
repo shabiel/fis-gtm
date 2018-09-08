@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2015 Fidelity National Information 	*
+ * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,9 +56,9 @@
 #endif
 
 #ifdef FULLBLOCKWRITES
-#  define DEFAULT_FBW_FLAG TRUE
+#  define DEFAULT_FBW_FLAG 1
 #else
-#  define DEFAULT_FBW_FLAG FALSE
+#  define DEFAULT_FBW_FLAG 0
 #endif
 #define SIZEOF_prombuf ggl_prombuf
 
@@ -70,7 +70,8 @@
 GBLREF	boolean_t	dollar_zquit_anyway;	/* if TRUE compile QUITs to not care whether or not they're from an extrinsic */
 GBLREF	uint4		gtmDebugLevel; 		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
-GBLREF	boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
+GBLREF	boolean_t	gtmSystemMalloc;	/* Use the system's malloc() instead of our own */
+GBLREF	int4		gtm_fullblockwrites;	/* Do full (not partial) database block writes */
 GBLREF	boolean_t	certify_all_blocks;
 GBLREF	uint4		gtm_blkupgrade_flag;	/* controls whether dynamic block upgrade is attempted or not */
 GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
@@ -86,13 +87,15 @@ GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation bar
 
 void	gtm_env_init(void)
 {
-	mstr			val, trans;
 	boolean_t		ret, is_defined;
+	char			buf[MAX_TRANS_NAME_LEN];
+	double			time;
+	int			status2, i, j;
+	int4			status;
+	mstr			val, trans;
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
 	uint4			max_threads, max_procs;
-	int4			status;
-	int			status2;
-	char			buf[MAX_TRANS_NAME_LEN];
+	int4			temp_gtm_strpllim;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -113,6 +116,9 @@ void	gtm_env_init(void)
 			if (GDL_SmStorHog & tdbglvl)
 				tdbglvl |= GDL_SmBackfill | GDL_SmChkAllocBackfill;
 			gtmDebugLevel |= tdbglvl;
+			gtmSystemMalloc = ((GDL_UseSystemMalloc & gtmDebugLevel) || FALSE);
+			if (gtmSystemMalloc)
+				gtmDebugLevel &= !GDL_SmAllMallocDebug;
 		}
 		/* gtm_boolean environment/logical */
 		val.addr = GTM_BOOLEAN;
@@ -216,9 +222,26 @@ void	gtm_env_init(void)
 		/* Full Database-block Write mode */
 		val.addr = GTM_FULLBLOCKWRITES;
 		val.len = SIZEOF(GTM_FULLBLOCKWRITES) - 1;
-		gtm_fullblockwrites = logical_truth_value(&val, FALSE, &is_defined);
-		if (!is_defined)
+		gtm_fullblockwrites = (int)logical_truth_value(&val, FALSE, &is_defined);
+		if (!is_defined) /* Variable not defined */
 			gtm_fullblockwrites = DEFAULT_FBW_FLAG;
+		else if (!gtm_fullblockwrites) /* Set to false */
+			gtm_fullblockwrites = FALSE;
+		else /* Set to true, exam for FULL_DATABASE_WRITE */
+		{
+			gtm_fullblockwrites = trans_numeric(&val, &is_defined, TRUE);
+			switch(gtm_fullblockwrites)
+			{
+			case FULL_FILESYSTEM_WRITE:
+			case FULL_DATABASE_WRITE:
+				/* Both these values are valid */
+				break;
+			default:
+				/* Else, assume FULL_FILESYSTEM_WRITE */
+				gtm_fullblockwrites = FULL_FILESYSTEM_WRITE;
+				break;
+			}
+		}
 		/* GDS Block certification */
 		val.addr = GTM_GDSCERT;
 		val.len = SIZEOF(GTM_GDSCERT) - 1;
@@ -294,12 +317,18 @@ void	gtm_env_init(void)
 			}
 		}
 		/* Initialize tpnotacidtime */
-		TREF(tpnotacidtime) = TPNOTACID_DEFAULT_TIME;
+		(TREF(tpnotacidtime)).m[1] = TPNOTACID_DEFAULT_TIME;
 		val.addr = GTM_TPNOTACIDTIME;
 		val.len = SIZEOF(GTM_TPNOTACIDTIME) - 1;
-		if ((status = trans_numeric(&val, &is_defined, TRUE)) && (0 <= status)
-			&& (TPNOTACID_MAX_TIME >= status) && is_defined)
-				TREF(tpnotacidtime) = status;	 /* NOTE assignment above */
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{
+			assert(SIZEOF(buf) > trans.len);
+			*(char *)(buf + trans.len) = 0;
+			errno = 0;
+			time = strtod(buf, NULL);
+			if ((ERANGE != errno) && (TPNOTACID_MAX_TIME >= time))
+				(TREF(tpnotacidtime)).m[1] = time * MILLISECS_IN_SEC;
+		}	/* gtm_startup completes initialization of the tpnotacidtime mval */
 		/* Initialize $gtm_tprestart_log_first */
 		val.addr = GTM_TPRESTART_LOG_FIRST;
 		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_FIRST);
@@ -376,6 +405,12 @@ void	gtm_env_init(void)
 		gtm_mupjnl_parallel = trans_numeric(&val, &is_defined, TRUE);
 		if (!is_defined)
 			gtm_mupjnl_parallel = 1;
+		/* See if $gtm_string_pool_limit is set */
+		val.addr = GTM_STRPLLIM;
+		val.len = SIZEOF(GTM_STRPLLIM) - 1;
+		temp_gtm_strpllim = trans_numeric(&val, &is_defined, TRUE);
+		if (0 < temp_gtm_strpllim)
+			TREF(gtm_strpllim) = temp_gtm_strpllim;
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,42 +76,42 @@ MBSTART {										\
 		{									\
 			c = TREF(curtchain);						\
 			chktchain(c);		/* this might be redundant, or not! */	\
-			c = TREF(expr_start);						\
-			if (NULL != c)							\
+			c = TREF(expr_start_orig);					\
+			if ((NULL != c) && (c != TREF(expr_start)))			\
 				chktchain(c);	/* this extra has been rewarding */	\
 		}									\
 	}										\
 } MBEND
 #  define dqdel(x, n)			\
 MBSTART {				\
-	CHKTCHAIN((x), (n), FALSE);	\
+	CHKTCHAIN((x), n, FALSE);	\
 	DQDEL((x), n);			\
-	CHKTCHAIN(-1, (n), TRUE);	\
+	CHKTCHAIN(-1, n, TRUE);	\
 } MBEND
 #  define dqdelchain(q, x, n)		\
 MBSTART {				\
-	CHKTCHAIN((q), (n), FALSE);	\
-	DQDELCHAIN((q), x, n);		\
-	CHKTCHAIN((q), (n), TRUE);	\
+	CHKTCHAIN((q), n, FALSE);	\
+	DQDELCHAIN((q), (x), n);		\
+	CHKTCHAIN((q), n, TRUE);	\
 } MBEND
 #  define dqins(q, n, x)		\
 MBSTART {				\
-	CHKTCHAIN((q), (n), FALSE);	\
-	DQINS((q), n, x);		\
-	CHKTCHAIN((q), (n), TRUE);	\
+	CHKTCHAIN((q), n, FALSE);	\
+	DQINS((q), n, (x));		\
+	CHKTCHAIN((q), n, TRUE);	\
 } MBEND
 #  define dqrins(q, n, x)		\
 MBSTART {				\
-	CHKTCHAIN((q), (n), FALSE);	\
-	DQRINS((q), n, x);		\
-	CHKTCHAIN((q), (n), TRUE);	\
+	CHKTCHAIN((q), n, FALSE);	\
+	DQRINS((q), n, (x));		\
+	CHKTCHAIN((q), n, TRUE);	\
 } MBEND
 #  define dqadd(q, x, n)		\
 MBSTART {				\
-	CHKTCHAIN((q), (n), FALSE);	\
-	CHKTCHAIN((x), (n), FALSE);	\
-	DQADD((q), x, n);		\
-	CHKTCHAIN((q), (n), TRUE);	\
+	CHKTCHAIN((q), n, FALSE);	\
+	CHKTCHAIN((x), n, FALSE);	\
+	DQADD((q), (x), n);		\
+	CHKTCHAIN((q), n, TRUE);	\
 } MBEND
 #endif
 

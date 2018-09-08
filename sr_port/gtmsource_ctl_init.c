@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@
 GBLDEF repl_ctl_element		*repl_ctl_list = NULL;
 GBLDEF repl_rctl_elem_t		*repl_rctl_list = NULL;
 
-GBLREF jnlpool_addrs		jnlpool;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF seq_num			seq_num_zero;
 
 GBLREF gd_addr			*gd_header;
@@ -223,7 +223,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		{	/* Concurrent online rollback. Possible only if we are called from gtmsource_update_zqgblmod_seqno_and_tn
 			 * in which case we don't hold the gtmsource_srv_latch. Assert that.
 			 */
-			assert(process_id != jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
+			assert(process_id != jnlpool->gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
 			SYNC_ONLN_RLBK_CYCLES;
 			gtmsource_onln_rlbk_clnup();
 			if (!was_crit)
@@ -253,11 +253,15 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 			{
 				if (!was_crit)
 					rel_crit(reg);
+				/* jnl_status may be ERR_JNLSWITCHRETRY, which has a severity of INFO, but we want to
+				 * treat it (or any other non-zero status) as an ERROR, so force it.
+				 */
 				if (SS_NORMAL != jpc->status)
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
-						DB_LEN_STR(reg), jpc->status);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) MAKE_MSG_TYPE(jnl_status, ERROR), 4,
+						JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
 				else
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) MAKE_MSG_TYPE(jnl_status, ERROR), 4,
+						JNL_LEN_STR(csd), DB_LEN_STR(reg));
 			} else
 			{
 				tmp_ctl->jnl_fn_len = csd->jnl_file_len;
@@ -507,7 +511,7 @@ int gtmsource_set_lookback(void)
 	for (ctl = repl_ctl_list->next; NULL != ctl; ctl = ctl->next)
 	{
 		if (((JNL_FILE_OPEN == ctl->file_state) || (JNL_FILE_CLOSED == ctl->file_state))
-				&& QWLE(jnlpool.gtmsource_local->read_jnl_seqno, ctl->seqno))
+				&& QWLE(jnlpool->gtmsource_local->read_jnl_seqno, ctl->seqno))
 			ctl->lookback = TRUE;
 		else
 			ctl->lookback = FALSE;

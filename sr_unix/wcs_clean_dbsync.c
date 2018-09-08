@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,8 @@
 #include "timers.h"		/* for TIM_DEFER_DBSYNC #define */
 #include "gdsbgtr.h"		/* for the BG_TRACE_PRO macros */
 #include "gtmio.h"		/* for the GET_LSEEK_FLAG macro */
+#include "repl_msg.h"		/* needed for gtmsource.h */
+#include "gtmsource.h"		/* needed for jnlpool_addrs typedef */
 #include "wcs_clean_dbsync.h"
 #include "wcs_flu.h"
 #include "lockconst.h"
@@ -45,6 +47,7 @@
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	volatile int4		crit_count;
 GBLREF	volatile boolean_t	in_mutex_deadlock_check;
 GBLREF	volatile int4		db_fsync_in_prog, jnl_qio_in_prog;
@@ -68,6 +71,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	node_local_ptr_t	cnl;
 	sgmnt_addrs		*csa, *check_csaddrs, *save_csaddrs;
 	sgmnt_data_ptr_t	csd, save_csdata;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	DEBUG_ONLY(boolean_t	save_ok_to_call_wcs_recover;)
 	boolean_t		is_mm;
 	DCL_THREADGBL_ACCESS;
@@ -89,6 +93,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	save_region = gv_cur_region; /* Save for later restore. See notes about restore */
 	save_csaddrs = cs_addrs;
 	save_csdata = cs_data;
+	save_jnlpool = jnlpool;
 	/* Save to see if we are in crit anywhere */
 	check_csaddrs = ((NULL == save_region || FALSE == save_region->open) ?  NULL : (&FILE_INFO(save_region)->s_addrs));
 	/* Note the non-usage of TP_CHANGE_REG_IF_NEEDED macros since this routine can be timer driven. */
@@ -139,9 +144,9 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		dbsync_defer_timer = TRUE;
 		if (!mupip_jnl_recover
 			GTM_MALLOC_NO_RENT_ONLY(&& 0 == gtmMallocDepth)
-			&& (0 == crit_count) && !in_mutex_deadlock_check
+			&& (INTRPT_IN_CRIT_FUNCTION != intrpt_ok_state) && !in_mutex_deadlock_check
 			&& (0 == fast_lock_count)
-			&& (!jnl_qio_in_prog) && (!db_fsync_in_prog)
+			&& (!db_fsync_in_prog)
 			&& (!jpc || (LOCK_AVAILABLE == jbp->fsync_in_prog_latch.u.parts.latch_pid))
 			&& (0 == TREF(crit_reg_count))
 			&& ((NULL == check_csaddrs) || !T_IN_COMMIT_OR_WRITE(check_csaddrs))
@@ -205,7 +210,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			dbsync_defer_timer = FALSE;
 			assert(!csa->hold_onto_crit); /* this ensures we can safely do unconditional rel_crit */
 			rel_crit(reg);
-			DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp); /* Do equivalent of WCSFLU_SYNC_EPOCH out of crit */
+			DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp); /* Do equivalent of WCSFLU_SYNC_EPOCH out of crit */
 		}
 	}
 	if (dbsync_defer_timer)
@@ -225,5 +230,6 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	gv_cur_region = save_region;
 	cs_addrs = save_csaddrs;
 	cs_data = save_csdata;
+	jnlpool = save_jnlpool;
 	return;
 }

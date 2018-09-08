@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -172,7 +172,8 @@ void zshow_devices(zshow_out *output)
 		if (l->iod->trans_name == l)
 		{
 			/* If it is an rm type we don't want to output the device if it is the stderr device for a pipe device */
-			if ((rm_ptr = (d_rm_struct*)l->iod->dev_sp) && rm == l->iod->type && rm_ptr->pipe && rm_ptr->stderr_parent)
+			if ((rm_ptr = (d_rm_struct*)l->iod->dev_sp) && (rm == l->iod->type)
+					&& rm_ptr->is_pipe && rm_ptr->stderr_parent)
 				continue;
 			if (l->iod->pair.in != l->iod->pair.out)
 			{
@@ -376,7 +377,7 @@ void zshow_devices(zshow_out *output)
 
 					if (rm_ptr->fifo)
 						ZS_STR_OUT(&v,fifo_text);
-					else if (!rm_ptr->pipe)
+					else if (!rm_ptr->is_pipe)
 					{
 						ZS_STR_OUT(&v,rmsfile_text);
 						if (rm_ptr->follow)
@@ -732,17 +733,7 @@ void zshow_devices(zshow_out *output)
 								mval_write(output, &m, FALSE);
 							}
 							ZS_ONE_OUT(&v, space_text);
-							if (NULL != socketptr->local.saddr_ip)
-							{
-								ZS_STR_OUT(&v, local_text);
-								v.str.addr = socketptr->local.saddr_ip;
-								v.str.len = STRLEN(socketptr->local.saddr_ip);
-								zshow_output(output, &v.str);
-								ZS_ONE_OUT(&v, at_text);
-								tmpport = (int)socketptr->local.port;
-								MV_FORCE_MVAL(&m, tmpport);
-								mval_write(output, &m, FALSE);
-							} else if (socket_local == socketptr->protocol)
+							if (socket_local == socketptr->protocol)
 							{
 								ZS_STR_OUT(&v, local_text);
 								if (NULL != socketptr->local.sa)
@@ -756,6 +747,16 @@ void zshow_devices(zshow_out *output)
 										   (socketptr->remote.sa))->sun_path;
 									ZS_VAR_STR_OUT(&v, charptr);
 								}
+							} else if (NULL != socketptr->local.saddr_ip)
+							{
+								ZS_STR_OUT(&v, local_text);
+								v.str.addr = socketptr->local.saddr_ip;
+								v.str.len = STRLEN(socketptr->local.saddr_ip);
+								zshow_output(output, &v.str);
+								ZS_ONE_OUT(&v, at_text);
+								tmpport = (int)socketptr->local.port;
+								MV_FORCE_MVAL(&m, tmpport);
+								mval_write(output, &m, FALSE);
 							}
 						}
 						ZS_ONE_OUT(&v, space_text);

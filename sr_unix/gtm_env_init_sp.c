@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2017 Fidelity National Information	*
+ * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,7 +78,6 @@
 /* GTM_TEST_JNLPOOL_SYNC is used only in debug code so it does not have to go in gtm_logicals.h */
 # define GTM_TEST_JNLPOOL_SYNC			"$gtm_test_jnlpool_sync"
 #endif
-#define DEFAULT_MUPIP_TRIGGER_ETRAP 		"IF $ZJOBEXAM()"
 
 /* Remove trailing '/' from path (unless only '/') */
 #define	REMOVE_TRAILING_SLASH_FROM_MSTR(TRANS)				\
@@ -95,23 +94,15 @@ GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	int			gtm_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
 GBLREF	char			*gtm_core_file;
 GBLREF	char			*gtm_core_putenv;
-GBLREF	mval			dollar_etrap;
-GBLREF	mval			dollar_ztrap;
-GBLREF	mval			dollar_zstep;
 GBLREF	boolean_t		dmterm_default;
 GBLREF	boolean_t		ipv4_only;		/* If TRUE, only use AF_INET. */
 ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
 ZOS_ONLY(GBLREF	boolean_t	gtm_tag_utf8_as_ascii;)
-GTMTRIG_ONLY(GBLREF	mval	gtm_trigger_etrap;)
 GBLREF	volatile boolean_t	timer_in_handler;
 #ifdef USE_LIBAIO
 GBLREF	char			io_setup_errstr[IO_SETUP_ERRSTR_ARRAYSIZE];
 #endif
 
-#ifdef GTM_TRIGGER
-LITDEF mval default_mupip_trigger_etrap = DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , (SIZEOF(DEFAULT_MUPIP_TRIGGER_ETRAP) - 1),
-							      DEFAULT_MUPIP_TRIGGER_ETRAP , 0 , 0 );
-#endif
 LITREF mstr relink_allowed_mstr[];
 
 static readonly nametabent editing_params[] =
@@ -129,7 +120,6 @@ static readonly unsigned char editing_index[27] =
 	3, 3, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
 	6, 6, 6
 };
-static readonly unsigned char init_break[1] = {'B'};
 
 error_def(ERR_INVLOCALE);
 error_def(ERR_INVLINKTMPDIR);
@@ -180,7 +170,7 @@ void	gtm_env_init_sp(void)
 	/* Validate $gtm_tmp if specified, else that default is available */
 	val.addr = GTM_TMP_ENV;
 	val.len = SIZEOF(GTM_TMP_ENV) - 1;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+	if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))) || (0 == trans.len))
 	{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
 		MEMCPY_LIT(buf, DEFAULT_GTM_TMP);
 		trans.addr = buf;
@@ -206,19 +196,6 @@ void	gtm_env_init_sp(void)
 	val.len = SIZEOF(GTM_LVNULLSUBS) - 1;
 	ret = trans_numeric(&val, &is_defined, TRUE); /* Not initialized enuf for errors yet so silent rejection of invalid vals */
 	TREF(lv_null_subs) = ((is_defined && (LVNULLSUBS_FIRST < ret) && (LVNULLSUBS_LAST > ret)) ? ret : LVNULLSUBS_OK);
-#	ifdef GTM_TRIGGER
-	val.addr = GTM_TRIGGER_ETRAP;
-	val.len = SIZEOF(GTM_TRIGGER_ETRAP) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
-	{
-		gtm_trigger_etrap.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
-		memcpy(gtm_trigger_etrap.str.addr, trans.addr, trans.len);
-		gtm_trigger_etrap.str.addr[trans.len] = '\0';
-		gtm_trigger_etrap.str.len = trans.len;
-		gtm_trigger_etrap.mvtype = MV_STR;
-	} else if (IS_MUPIP_IMAGE)
-		gtm_trigger_etrap = default_mupip_trigger_etrap;
-#	endif
 	/* ZLIB library compression level */
 	val.addr = GTM_ZLIB_CMP_LEVEL;
 	val.len = SIZEOF(GTM_ZLIB_CMP_LEVEL) - 1;
@@ -341,7 +318,7 @@ void	gtm_env_init_sp(void)
 	/* Initialize variable that controls the location of GT.M custom errors file (used for anticipatory freeze) */
 	val.addr = GTM_CUSTOM_ERRORS;
 	val.len = SIZEOF(GTM_CUSTOM_ERRORS) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))) && (0 < trans.len))
 	{
 		assert(GTM_PATH_MAX > trans.len);
 		(TREF(gtm_custom_errors)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
@@ -352,33 +329,6 @@ void	gtm_env_init_sp(void)
 			memcpy((TREF(gtm_custom_errors)).addr, buf, trans.len);
 			((TREF(gtm_custom_errors)).addr)[trans.len] = '\0';
 		}
-	}
-	/* Initialize which ever error trap we are using (ignored in the utilities except the update process) */
-	val.addr = GTM_ETRAP;
-	val.len = SIZEOF(GTM_ETRAP) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
-	{
-		dollar_etrap.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
-		memcpy(dollar_etrap.str.addr, trans.addr, trans.len);
-		dollar_etrap.str.addr[trans.len] = '\0';
-		dollar_etrap.str.len = trans.len;
-		dollar_etrap.mvtype = MV_STR;
-	} else if (0 == dollar_etrap.mvtype)
-	{	/* If didn't setup $ETRAP, set default $ZTRAP instead */
-		dollar_ztrap.mvtype = MV_STR;
-		dollar_ztrap.str.len = SIZEOF(init_break);
-		dollar_ztrap.str.addr = (char *)init_break;
-	}
-	/* Initiaalize $ZSTEP fro $gtm_zstep enviroment variable. Default value is initailzed in gbldefs.c */
-	val.addr = GTM_ZSTEP;
-	val.len = SIZEOF(GTM_ZSTEP) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
-	{
-		dollar_zstep.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
-		memcpy(dollar_zstep.str.addr, trans.addr, trans.len);
-		dollar_zstep.str.addr[trans.len] = '\0';
-		dollar_zstep.str.len = trans.len;
-		dollar_zstep.mvtype = MV_STR;
 	}
 	/* See if gtm_link is set */
 	val.addr = GTM_LINK;
@@ -397,7 +347,8 @@ void	gtm_env_init_sp(void)
 		{	/* Else use default $gtm_tmp value or its default */
 			val.addr = GTM_TMP_ENV;
 			val.len = SIZEOF(GTM_TMP_ENV) - 1;
-			if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+			if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+					|| (0 < trans.len))
 			{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
 				trans.addr = DEFAULT_GTM_TMP;
 				trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
@@ -563,8 +514,7 @@ void	gtm_env_init_sp(void)
 	val.addr = GTM_STATSHARE;
 	val.len = SIZEOF(GTM_STATSHARE) - 1;
 	ret = logical_truth_value(&val, FALSE, &is_defined);
-	if (is_defined)
-		TREF(statshare_opted_in) = ret;
+	TREF(statshare_opted_in) = (!is_defined) ? NO_STATS_OPTIN : ret ? ALL_STATS_OPTIN : NO_STATS_OPTIN;
 	/* Pull in specified gtm_statsdir if specified, else default to gtm_tmp or its default. Note we don't validate the directory
 	 * here. It need not exist until a database is opened. If gtm_statsdir does not exist, find an appropriate default and
 	 * set it so it is always resolvable.
@@ -572,14 +522,16 @@ void	gtm_env_init_sp(void)
 	val.addr = GTM_STATSDIR;
 	val.len = SIZEOF(GTM_STATSDIR) - 1;
 	/* Using MAX_FN_LEN below instead of GTM_PATH_MAX because csa->nl->statsdb_fname[] size is MAX_FN_LEN + 1 */
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
+	if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
+			|| (0 == trans.len))
 	{	/* Either no translation for $gtm_statsdir or the current and/or expanded value of $gtm_statsdir exceeds the
 		 * max path length. For either case $gtm_statsdir needs to be (re)set so try to use $gtm_tmp instead - note
 		 * from here down we'll (re)set $gtm_statsdir so it ALWAYS has a (valid) value for mu_cre_file() to later use.
 		 */
 		val.addr = GTM_TMP_ENV;
 		val.len = SIZEOF(GTM_TMP_ENV) - 1;
-		if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
+		if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
+				|| (0 == trans.len))
 		{	/* Nothing for $gtm_tmp - use DEFAULT_GTM_TMP instead */
 			trans.addr = DEFAULT_GTM_TMP;
 			trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;

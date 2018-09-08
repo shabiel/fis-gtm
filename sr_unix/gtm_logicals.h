@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -146,10 +146,13 @@
 #define	GTMDBGFLAGS			"$gtmdbgflags"
 #define	GTMDBGFLAGS_FREQ		"$gtmdbgflags_freq"
 #define GTM_MAX_STORALLOC		"$gtm_max_storalloc"
+#define GTM_MSTACK_SIZE			"$gtm_mstack_size"
+#define GTM_MSTACK_CRIT_THRESH		"$gtm_mstack_crit_threshold"
 #define GTM_IPV4_ONLY			"$gtm_ipv4_only"
 #define GTM_DMTERM			"$gtm_dmterm"
 #define	GTM_MUPJNL_PARALLEL		"$gtm_mupjnl_parallel"
 #define GTM_LOCALE			"$gtm_locale"
 #define GTM_UTFCGR_STRINGS		"$gtm_utfcgr_strings"
 #define GTM_UTFCGR_STRING_GROUPS	"$gtm_utfcgr_string_groups"
+#define GTM_STRPLLIM			"$gtm_string_pool_limit"
 

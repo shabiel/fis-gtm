@@ -54,7 +54,6 @@
 #include "ctrlc_handler.h"
 #include "get_page_size.h"
 #include "generic_signal_handler.h"
-#include "init_secshr_addrs.h"
 #include "zcall_package.h"
 #include "getzdir.h"
 #include "getzmode.h"
@@ -65,8 +64,9 @@
 #include "jobchild_init.h"
 #include "error_trap.h"			/* for ecode_init() prototype */
 #include "zyerror_init.h"
-#include "ztrap_form_init.h"
+#include "trap_env_init.h"
 #include "zdate_form_init.h"
+#include "mstack_size_init.h"
 #include "dollar_system_init.h"
 #include "sig_init.h"
 #include "gtm_startup.h"
@@ -142,11 +142,11 @@ void gtm_startup(struct startup_vector *svec)
 	 * while in UNIX, it's all done with environment variables
 	 * hence, various references to data copied from *svec could profitably be referenced directly
 	 */
-	unsigned char	*mstack_ptr;
-	void		gtm_ret_code();
-	static char 	other_mode_buf[] = "OTHER";
+	char		*temp;
 	mstr		log_name;
 	stack_frame 	*frame_pointer_lcl;
+	static char 	other_mode_buf[] = "OTHER";
+	void		gtm_ret_code();
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -161,12 +161,7 @@ void gtm_startup(struct startup_vector *svec)
 	stpgc_ch = &stp_gcol_ch;
 	rtn_fst_table = rtn_names = (rtn_tabent *)svec->rtn_start;
 	rtn_names_end = rtn_names_top = (rtn_tabent *)svec->rtn_end;
-	if (svec->user_stack_size < 4096)
-		svec->user_stack_size = 4096;
-	if (svec->user_stack_size > 8388608)
-		svec->user_stack_size = 8388608;
-	mstack_ptr = (unsigned char *)malloc(svec->user_stack_size);
-	msp = stackbase = mstack_ptr + svec->user_stack_size - mvs_size[MVST_STORIG];
+	mstack_size_init(svec);
 	/* mark the stack base so that if error occur during call-in gtm_init(), the unwind
 	 * logic in gtmci_ch() will get rid of the stack completely
 	 */
@@ -175,8 +170,6 @@ void gtm_startup(struct startup_vector *svec)
 	mv_chain->mv_st_type = MVST_STORIG;	/* Initialize first (anchor) mv_stent so doesn't do anything */
 	mv_chain->mv_st_next = 0;
 	mv_chain->mv_st_cont.mvs_storig = 0;
-	stacktop = mstack_ptr + 2 * mvs_size[MVST_NTAB];
-	stackwarn = stacktop + (16 * 1024);
 	break_message_mask = svec->break_message_mask;
 	if (svec->user_strpl_size < STP_INITSIZE)
 		svec->user_strpl_size = STP_INITSIZE;
@@ -184,6 +177,12 @@ void gtm_startup(struct startup_vector *svec)
 		svec->user_strpl_size = STP_MAXINITSIZE;
 	stp_init(svec->user_strpl_size);
 	rts_stringpool = stringpool;
+	(TREF(tpnotacidtime)).mvtype = MV_NM | MV_INT;	/* gtm_env_init set up a numeric value, now there's a stp: string it */
+	MV_FORCE_STRD(&(TREF(tpnotacidtime)));
+	assert(6 >= (TREF(tpnotacidtime)).str.len);
+	temp = malloc((TREF(tpnotacidtime)).str.len);
+	memcpy(temp, (TREF(tpnotacidtime)).str.addr, (TREF(tpnotacidtime)).str.len);
+	(TREF(tpnotacidtime)).str.addr = temp;
 	TREF(compile_time) = FALSE;
 	/* assert that is_replicator and run_time is properly set by gtm_imagetype_init invoked at process entry */
 #	ifdef DEBUG
@@ -206,7 +205,6 @@ void gtm_startup(struct startup_vector *svec)
 	/* mstr_native_align = logical_truth_value(&log_name, FALSE, NULL) ? FALSE : TRUE; */
 	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
 	getjobname();
-	INVOKE_INIT_SECSHR_ADDRS;
 	getzprocess();
 	getzmode();
 	zcall_init();
@@ -257,7 +255,8 @@ void gtm_startup(struct startup_vector *svec)
 	dollar_zstatus.str.addr = NULL;
 	ecode_init();
 	zyerror_init();
-	ztrap_form_init();
+	if (IS_MUMPS_IMAGE)
+		trap_env_init();
 	zdate_form_init(svec);
 	dollar_system_init(svec);
 	init_callin_functable();

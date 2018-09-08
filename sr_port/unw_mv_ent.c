@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,10 +11,6 @@
  ****************************************************************/
 
 #include "mdef.h"
-
-#ifdef VMS
-#include <fab.h>		/* needed for dbgbldir_sysops.h */
-#endif
 
 #include "gtm_string.h"
 #include "gtm_unistd.h"
@@ -47,13 +43,12 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "have_crit.h"
-#ifdef UNIX
 #include "iormdef.h"
 #include "iottdef.h"
-#endif
 #include "stack_frame.h"
 #include "alias.h"
 #include "tp_timeout.h"
+#include "localvarmonitor.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -66,8 +61,6 @@ GBLREF gv_namehead		*gv_target;
 GBLREF gd_addr			*gd_header;
 GBLREF dollar_ecode_type	dollar_ecode;
 GBLREF dollar_stack_type	dollar_stack;
-GBLREF mval			dollar_etrap;
-GBLREF mval			dollar_ztrap;
 GBLREF mval			dollar_zgbldir;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
@@ -132,19 +125,19 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 	{
 		case MVST_MSAV:
 			*mv_st_ent->mv_st_cont.mvs_msav.addr = mv_st_ent->mv_st_cont.mvs_msav.v;
-			if (&dollar_etrap == mv_st_ent->mv_st_cont.mvs_msav.addr)
+			if (&(TREF(dollar_etrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
 			{
 				ztrap_explicit_null = FALSE;
-				dollar_ztrap.str.len = 0;
-			} else if (&dollar_ztrap == mv_st_ent->mv_st_cont.mvs_msav.addr)
+				(TREF(dollar_ztrap)).str.len = 0;
+			} else if (&(TREF(dollar_ztrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
 			{
-				if (STACK_ZTRAP_EXPLICIT_NULL == dollar_ztrap.str.len)
+				if (STACK_ZTRAP_EXPLICIT_NULL == (TREF(dollar_ztrap)).str.len)
 				{
-					dollar_ztrap.str.len = 0;
+					(TREF(dollar_ztrap)).str.len = 0;
 					ztrap_explicit_null = TRUE;
 				} else
 					ztrap_explicit_null = FALSE;
-				dollar_etrap.str.len = 0;
+				(TREF(dollar_etrap)).str.len = 0;
 				if (tp_timeout_deferred UNIX_ONLY( && !dollar_zininterrupt))
 					/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and we are not in a
 					 * job interrupt, the timeout can no longer be deferred and needs to be recognized.
@@ -181,6 +174,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				assert(mv_st_ent->mv_st_cont.mvs_stab == curr_symval);
 				symval_ptr = curr_symval;
 				curr_symval = symval_ptr->last_tab;
+				(TREF(curr_symval_cycle))++;
 				DBGRFCT((stderr, "\n\n***** unw_mv_ent-STAB: ** Symtab pop with 0x"lvaddr" replacing 0x"
 					 lvaddr"\n\n", curr_symval, symval_ptr));
 #				ifdef GTM_TRIGGER
@@ -346,7 +340,6 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				return;	/* already processed */
 			switch(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->type)
 			{
-#				ifdef UNIX
 				case tt:
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
@@ -361,14 +354,13 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
 						rm_ptr = (d_rm_struct *)(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->dev_sp);
-						assert(rm_ptr->pipe || rm_ptr->fifo || rm_ptr->follow);
+						assert(rm_ptr->is_pipe || rm_ptr->fifo || rm_ptr->follow);
 						rm_ptr->mupintr = FALSE;
 						rm_ptr->pipe_save_state.who_saved = pipewhich_invalid;
 						mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 						mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 					}
 					return;
-#				endif
 				case gtmsocket:
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
@@ -459,8 +451,8 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			gtm_trigger_depth = mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigger_depth_save;
 			if (0 == gtm_trigger_depth)
 			{	/* Only restore error handling environment if returning out of trigger-world */
-				dollar_etrap = mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save;
-				dollar_ztrap = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
+				TREF(dollar_etrap) = mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save;
+				TREF(dollar_ztrap) = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
 				ztrap_explicit_null = mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save;
 			}
 			DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);

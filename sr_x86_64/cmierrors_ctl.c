@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,8 +66,17 @@ LITDEF	int CMI_REASON_OVERRUN = 150634682;
 LITDEF	int CMI_REASON_STATUS = 150634690;
 LITDEF	int CMI_REASON_CONFIRM = 150634698;
 
+
+LITDEF	int cmierrors_undocarr[] = {
+};
+
+
 GBLDEF	err_ctl cmierrors_ctl = {
 	250,
 	"CMI",
 	&cmierrors[0],
-	25};
+	25,
+	&cmierrors_undocarr[0],
+	0
+};
+

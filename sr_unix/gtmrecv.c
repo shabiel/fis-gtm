@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,9 +56,9 @@
 #include "sgtm_putmsg.h"
 #include "gt_timer.h"
 #include "ftok_sem_incrcnt.h"
-#include "init_secshr_addrs.h"
 #include "mutex.h"
 #include "fork_init.h"
+#include "io.h"
 #include "gtmio.h"
 
 GBLDEF	boolean_t		gtmrecv_fetchreysnc;
@@ -78,7 +78,7 @@ GBLREF	boolean_t		is_rcvr_server;
 GBLREF	int			gtmrecv_srv_count;
 GBLREF	uint4			log_interval;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
 LITREF	gtmImageName		gtmImageNames[];
@@ -110,6 +110,7 @@ int gtmrecv(void)
 	repl_inst_hdr		updresync_inst_hdr;
 	uint4			gtmrecv_pid;
 	int			idx, semval, status, save_upd_status, upd_start_status, upd_start_attempts;
+	struct stat		stat_buf;
 	char			print_msg[1024], tmpmsg[1024];
 	pid_t			pid, procgp;
 	int			exit_status, waitpid_res, save_errno;
@@ -128,25 +129,26 @@ int gtmrecv(void)
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	if (gtmrecv_options.start || gtmrecv_options.shut_down)
 	{
-		jnlpool_init(GTMRECEIVE, (boolean_t)FALSE, (boolean_t *)NULL);
-		assert(NULL != jnlpool.repl_inst_filehdr);
-		assert(NULL != jnlpool.jnlpool_ctl);
+		jnlpool_init(GTMRECEIVE, (boolean_t)FALSE, (boolean_t *)NULL, NULL);
+		assert(NULL != jnlpool);
+		assert(NULL != jnlpool->repl_inst_filehdr);
+		assert(NULL != jnlpool->jnlpool_ctl);
 		/* If -UPDATERESYNC was specified without an empty instance file, error out. The only exception is if
 		 * the receiver is a root primary (updates enabled) supplementary instance and the source is non-supplementary.
 		 * In this case, since the non-supplementary stream is being ADDED to an existing instance file, there is no
 		 * requirement that the current instance file be empty. In fact, in that case we expect it to be non-empty
 		 * as one history record would have been written by the source server that brought up the root primary instance.
 		 */
-		if (gtmrecv_options.updateresync && jnlpool.repl_inst_filehdr->num_histinfo
-				&& !(jnlpool.repl_inst_filehdr->is_supplementary && !jnlpool.jnlpool_ctl->upd_disabled))
+		if (gtmrecv_options.updateresync && jnlpool->repl_inst_filehdr->num_histinfo
+				&& !(jnlpool->repl_inst_filehdr->is_supplementary && !jnlpool->jnlpool_ctl->upd_disabled))
 			/* replication instance file is NOT empty. Issue error */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UPDSYNC2MTINS);
 		if (gtmrecv_options.noresync)
 		{	/* If -NORESYNC was specified on a non-supplementary receiver instance, issue an error */
-			if (!jnlpool.repl_inst_filehdr->is_supplementary)
+			if (!jnlpool->repl_inst_filehdr->is_supplementary)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NORESYNCSUPPLONLY);
 			/* If -NORESYNC was specified on a receiver instance where updates are disabled, issue an error */
-			if (jnlpool.jnlpool_ctl->upd_disabled)
+			if (jnlpool->jnlpool_ctl->upd_disabled)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NORESYNCUPDATERONLY);
 		}
 	}
@@ -265,7 +267,7 @@ int gtmrecv(void)
 				assert(4 == SIZEOF(updresync_inst_hdr.num_histinfo)); /* so need to use GTM_BYTESWAP_32 */
 				updresync_inst_hdr.num_histinfo = GTM_BYTESWAP_32(updresync_inst_hdr.num_histinfo);
 			}
-			if (jnlpool.repl_inst_filehdr->is_supplementary && !updresync_inst_hdr.is_supplementary)
+			if (jnlpool->repl_inst_filehdr->is_supplementary && !updresync_inst_hdr.is_supplementary)
 			{	/* Do one check for non-supplementary -> supplementary connection using -updateresync.
 				 * This is because this use of -updateresync is different than the other connection usages.
 				 */
@@ -295,7 +297,7 @@ int gtmrecv(void)
 			{	/* The input instance file is supplementary. Allow it only if the current instance is
 				 * supplementary and is not a root primary.
 				 */
-				if (!jnlpool.repl_inst_filehdr->is_supplementary)
+				if (!jnlpool->repl_inst_filehdr->is_supplementary)
 				{
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
@@ -303,16 +305,16 @@ int gtmrecv(void)
 							  	" to match current instance"));
 					assert(FALSE);
 				}
-				if (!jnlpool.jnlpool_ctl->upd_disabled)
+				if (!jnlpool->jnlpool_ctl->upd_disabled)
 				{
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
 						  LEN_AND_LIT("Input instance file must be non-supplementary"
 							  	" as current instance is a supplementary root primary"));
 				}
-			} else if (jnlpool.repl_inst_filehdr->is_supplementary)
+			} else if (jnlpool->repl_inst_filehdr->is_supplementary)
 			{
-				if (jnlpool.jnlpool_ctl->upd_disabled)
+				if (jnlpool->jnlpool_ctl->upd_disabled)
 				{	/* The input instance file is non-supplementary. Allow it only if the current
 					 * instance is non-supplementary or if it is a supplementary root primary.
 					 */
@@ -327,7 +329,7 @@ int gtmrecv(void)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INITORRESUME);
 				}
 			}
-			if (!jnlpool.repl_inst_filehdr->is_supplementary || jnlpool.jnlpool_ctl->upd_disabled)
+			if (!jnlpool->repl_inst_filehdr->is_supplementary || jnlpool->jnlpool_ctl->upd_disabled)
 			{
 				if (gtmrecv_options.resume_specified)
 				{
@@ -383,23 +385,11 @@ int gtmrecv(void)
 		gtmrecv_exit(gtmrecv_showbacklog() - NORMAL_SHUTDOWN);
 	else
 		gtmrecv_exit(gtmrecv_statslog() - NORMAL_SHUTDOWN);
-	/* Point stdin to /dev/null */
-	OPENFILE("/dev/null", O_RDONLY, null_fd);
-	if (0 > null_fd)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
-	FCNTL3(null_fd, F_DUPFD, 0, rc);
-	if (0 > rc)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
-	CLOSEFILE(null_fd, rc);
-	if (0 > rc)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
 	assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
 	assert(holds_sem[RECV][RECV_SERV_OPTIONS_SEM]);
 	is_rcvr_server = TRUE;
 	process_id = getpid();
 	OPERATOR_LOG_MSG;
-	/* Reinvoke secshr related initialization with the child's pid */
-	INVOKE_INIT_SECSHR_ADDRS;
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
 	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
 	 * redo the initialization with the child process id.
@@ -464,27 +454,44 @@ int gtmrecv(void)
 	if (-1 == (procgp = setsid()))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			  RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
+	/* Point stdin to /dev/null */
+	OPENFILE("/dev/null", O_RDONLY, null_fd);
+	if (0 > null_fd)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
+	assert(null_fd > 2);
+	/* Detached from the initiating process, now detach from the starting IO */
+	io_rundown(NORMAL_RUNDOWN);
+	FSTAT_FILE(gtmrecv_log_fd, &stat_buf, log_init_status);
+	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
+	DUP2(null_fd, 0, rc);
+	if (0 > rc)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
+	/* Re-init IO now that we have opened the log file and set stdin to /dev/null */
+	io_init(IS_MUPIP_IMAGE);
+	CLOSEFILE(null_fd, rc);
+	if (0 > rc)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
 	gtm_event_log_init();
 	gtmrecv_local->recv_serv_pid = process_id;
-	assert(NULL != jnlpool.jnlpool_ctl);
-	jnlpool.jnlpool_ctl->gtmrecv_pid = process_id;
+	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
+	jnlpool->jnlpool_ctl->gtmrecv_pid = process_id;
 	gtmrecv_local->listen_port = gtmrecv_options.listen_port;
 	/* Log receiver server startup command line first */
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "%s %s\n", cli_lex_in_ptr->argv[0], cli_lex_in_ptr->in_str);
 
-	assert(NULL != jnlpool.repl_inst_filehdr);
+	assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
 	SPRINTF(tmpmsg, "GTM Replication Receiver Server with Pid [%d] started on replication instance [%s]",
-		process_id, jnlpool.repl_inst_filehdr->inst_info.this_instname);
+		process_id, jnlpool->repl_inst_filehdr->inst_info.this_instname);
 	sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
-			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
+			jnlpool->repl_inst_filehdr->jnlpool_shmid, jnlpool->repl_inst_filehdr->jnlpool_semid);
 	gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
 	if (recvpool_ctl->fresh_start)
 	{
 		QWASSIGNDW(recvpool_ctl->jnl_seqno, 0); /* Update process will initialize this to a non-zero value */
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Created recvpool with shmid = [%d] and semid = [%d]\n",
-				jnlpool.repl_inst_filehdr->recvpool_shmid, jnlpool.repl_inst_filehdr->recvpool_semid);
+				jnlpool->repl_inst_filehdr->recvpool_shmid, jnlpool->repl_inst_filehdr->recvpool_semid);
 	} else
 	{	/* Coming up after a crash, reset Update process read.  This is done by setting gtmrecv_local->restart.
 		 * This will trigger update process to reset recvpool_ctl->jnl_seqno too.
@@ -496,7 +503,7 @@ int gtmrecv(void)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Attached to existing recvpool with shmid = [%d] and semid = [%d]\n",
-				jnlpool.repl_inst_filehdr->recvpool_shmid, jnlpool.repl_inst_filehdr->recvpool_semid);
+				jnlpool->repl_inst_filehdr->recvpool_shmid, jnlpool->repl_inst_filehdr->recvpool_semid);
 	}
 	save_upd_status = upd_proc_local->upd_proc_shutdown;
 	for (upd_start_attempts = 0;

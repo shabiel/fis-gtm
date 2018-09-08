@@ -56,7 +56,7 @@ GBLREF pattern		*pattern_list;
 GBLREF pattern		*curr_pattern;
 GBLREF pattern		mumps_pattern;
 GBLREF uint4		*pattern_typemask;
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF void		(*ctrlc_handler_ptr)();
 GBLREF void		(*tp_timeout_action_ptr)(void);
 GBLREF void		(*tp_timeout_clear_ptr)(void);
@@ -189,7 +189,6 @@ void init_gtm(void)
 	svec.argcnt = SIZEOF(svec);
 	svec.rtn_start = svec.rtn_end = malloc(SIZEOF(rtn_tabent));
 	memset(svec.rtn_start, 0, SIZEOF(rtn_tabent));
-	svec.user_stack_size = (272 ZOS_ONLY(+ 64))* 1024;	/* ZOS stack frame 2x other platforms so give more stack */
 	svec.user_strpl_size = STP_INITSIZE_REQUESTED;
 	svec.ctrlc_enable = 1;
 	svec.break_message_mask = 31;

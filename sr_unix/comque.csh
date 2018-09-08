@@ -1,7 +1,8 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2018 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -108,6 +109,9 @@ case "[Pp]*":
 			"$gt_as_options_common $gt_as_option_I $gt_as_option_optimize"
 		set comque_cc_options_default = \
 			"$gt_cc_options_common $gt_cc_option_I $gt_cc_option_optimize"
+		if ( "$HOSTOS" == "Linux" ) then
+			set comque_cc_options_default = "$comque_cc_options_default $gt_cc_option_debug"
+		endif
 		breaksw
 
 endsw
@@ -147,6 +151,7 @@ if ( ! -d $gtm_ver/log ) then
 	chmod 775 $gtm_ver/log
 endif
 
+rm -f $gtm_ver/log/comlist.$comque_image.log
 if ( $?comque_no_background != 0) then
 	if ( $?comque_batch_mode != 0) then
 		/usr/local/bin/tcsh $gtm_tools/comlist.csh \

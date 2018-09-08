@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "cmd.h"
 
 GBLREF	boolean_t	run_time;
+GBLREF mline		*mline_tail;
 
 error_def(ERR_ACTOFFSET);
 
@@ -33,6 +34,7 @@ int m_do(void)
 #	ifndef __i386
 	triple		*tripsize;
 #	endif
+	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -42,6 +44,7 @@ int m_do(void)
 		{
 			calltrip = newtriple(OC_CALLSP);
 			calltrip->operand[0] = put_mnxl();
+			mline_tail->block_ok = TRUE;
 #			ifndef __i386
 			calltrip->operand[1] = put_ocnt();
 #			endif
@@ -172,9 +175,10 @@ int m_do(void)
 			;
 		if (OC_LIT == triptr->opcode)
 		{	/* it's a literal so optimize it */
-			unuse_literal(&triptr->operand[0].oprval.mlit->v);
+			v = &triptr->operand[0].oprval.mlit->v;
+			unuse_literal(v);
 			dqdel(triptr, exorder);
-			if (0 == triptr->operand[0].oprval.mlit->v.m[1])
+			if (0 == MV_FORCE_BOOL(v))
 			{
 				setcurtchain(oldchain);		/* it's a FALSE so just discard the whole thing */
 #				ifndef __i386

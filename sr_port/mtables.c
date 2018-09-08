@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,7 @@
 #endif
 #include "gtm_reservedDB.h"
 #include "mtables.h"
+#include "iotimer.h"
 
 LITDEF char ctypetab[NUM_CHARS] =
 {
@@ -199,7 +200,7 @@ LITDEF boolean_t mvs_save[] =
 /* The address of this literal is assigned to mval pointers for arguments which are deliberately skipped in label invocations. */
 LITDEF mval skiparg		= DEFINE_MVAL_COMMON(0, 0, 0, 0, 0, 0, 0, 0);
 
-static readonly unsigned char localpool[8] = {'-', '1', '1', '1', '0', '1', '0', '0'};
+static readonly unsigned char localpool[15] = {'-', '1', '1', '1', '0', '1', '0', '0', '5', '2', '4', '2', '8', '6'};
 LITDEF mval literal_minusone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  -1 * MV_BIAS);
 LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[4], 0,   0);
 LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[1], 0,   1 * MV_BIAS);
@@ -209,6 +210,7 @@ LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0,
 LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[3], 0, 101 * MV_BIAS);
 LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 110 * MV_BIAS);
 LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 111 * MV_BIAS);
+LITDEF mval literal_notimeout	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 6, (char *)&localpool[8], 0, NO_M_TIMEOUT);
 
 /* --------------------------------------------------------------------------------------------------------------------------
  * All string mvals defined in this module using LITDEF need to have MV_NUM_APPROX bit set. This is because these mval
@@ -275,6 +277,9 @@ LITDEF	gtmImageName	gtmImageNames[n_image_types] =
 #undef IMAGE_TABLE_ENTRY
 };
 
+#define DEFAULT_ETRAP		"IF $ZJOBEXAM()"
+LITDEF mval default_etrap = DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , (SIZEOF(DEFAULT_ETRAP) - 1),  DEFAULT_ETRAP , 0 , 0 );
+
 LITDEF mname_entry 	null_mname_entry =
 {
 	{UNIX_ONLY_COMMA(0) 0, NULL},
@@ -299,12 +304,14 @@ LITDEF mval *fnzqgblmod_table[2] =
 	&literal_zero, &literal_one
 };
 
-LITDEF char gtm_release_name[]   = GTM_RELEASE_NAME;
-LITDEF int4 gtm_release_name_len = SIZEOF(GTM_RELEASE_NAME) - 1;
-LITDEF char gtm_product[]        = GTM_PRODUCT;
-LITDEF int4 gtm_product_len      = SIZEOF(GTM_PRODUCT) - 1;
-LITDEF char gtm_version[]        = GTM_VERSION;
-LITDEF int4 gtm_version_len      = SIZEOF(GTM_VERSION) - 1;
+LITDEF char gtm_release_name[]    = GTM_RELEASE_NAME;
+LITDEF int4 gtm_release_name_len  = SIZEOF(GTM_RELEASE_NAME) - 1;
+LITDEF char gtm_product[]         = GTM_PRODUCT;
+LITDEF int4 gtm_product_len       = SIZEOF(GTM_PRODUCT) - 1;
+LITDEF char gtm_version[]         = GTM_VERSION;
+LITDEF int4 gtm_version_len       = SIZEOF(GTM_VERSION) - 1;
+LITDEF char gtm_release_stamp[]   = GTM_RELEASE_STAMP;
+LITDEF int4 gtm_release_stamp_len = SIZEOF(GTM_RELEASE_STAMP) - 1;
 
 /* Indexed by enum db_ver in gdsdbver.h. Note that a db_ver value can be -1 but only in
  * the internal context of incremental/stream backup so the value should never appear where
@@ -399,16 +406,33 @@ LITDEF unsigned char upper_to_lower_table[] =
  *      13, 37, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289,  24593, 49157, 98317, 196613, 393241, 786433, 1572869,
  *      3145739, 6291469, 12582917, 25165843, 50331653, 100663319,  201326611, 402653189, 805306457, 1610612741, 0};
  */
-LITDEF int ht_sizes[] =
+LITDEF int default_ht_sizes[] =
 {
-	13, 37, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289,  24593, 49157,
+	13, 37, 53, 97, 193, 389, 769, 1543,   3079,       6151,    12289,    24593,    49157,
 	/* Above doubles the table size. But below has slower progression */
-	62501, 102503, 154981, 218459, 290047, 366077, 442861, 517151,
-	603907, 705247, 823541, 961729, 1123079, 1311473, 1531499, 1788443,
-	2088497, 2438881, 2848057, 3325901, 3883903, 4535483, 5296409, 6185021,
-	7222661, 8434427, 9849503, 11502019, 13431661, 15685133, 18316643, 21389671,
-	24978257, 29168903, 34062629, 39777391, 46450931, 54244103, 0
+	    62501,    102503,     154981,    218459,     290047,   366077,   442861,   517151,
+	   603907,    705247,     823541,    961729,    1123079,  1311473,  1531499,  1788443,
+	  2088497,   2438881,    2848057,   3325901,    3883903,  4535483,  5296409,  6185021,
+	  7222661,   8434427,    9849503,  11502019,   13431661, 15685133, 18316643, 21389671,
+	 24978257,  29168903,   34062629,  39777391,   46450931, 54244103,
+	        0
 };
+
+LITDEF int extended_ht_sizes[] =
+{
+	13, 37, 53, 97, 193, 389, 769, 1543,   3079,       6151,    12289,    24593,    49157,
+	/* Above doubles the table size. But below has slower progression */
+	    62501,    102503,     154981,    218459,     290047,   366077,   442861,   517151,
+	   603907,    705247,     823541,    961729,    1123079,  1311473,  1531499,  1788443,
+	  2088497,   2438881,    2848057,   3325901,    3883903,  4535483,  5296409,  6185021,
+	  7222661,   8434427,    9849503,  11502019,   13431661, 15685133, 18316643, 21389671,
+	 24978257,  29168903,   34062629,  39777391,   46450931, 54244103,
+	/* This table uses the remaining primes from the commented out hash table */
+	100663319, 201326611,  402653189, 805306457, 1610612741,
+	        0
+};
+
+GBLDEF int *ht_sizes = (int *)&default_ht_sizes;
 
 #ifdef UNIX
 /* Primarily used by gtm_trigger_complink() */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,6 @@
 #include "gt_timer.h"
 #include "copy.h"
 #include "iottdef.h"
-#include "iomtdef.h"
 #include "iormdef.h"
 #include "mupip_io_dev_dispatch.h"
 #include "eintr_wrappers.h"
@@ -57,10 +56,10 @@ error_def(ERR_SYSCALL);
 LITREF mstr			chset_names[];
 LITREF	unsigned char		io_params_size[];
 
-static bool mu_open_try(io_log_name *, io_log_name *, mval *, mval *);
+static boolean_t mu_open_try(io_log_name *, io_log_name *, mval *, mval *);
 
 /*	The third parameter is dummy to keep the inteface same as op_open	*/
-int mu_op_open(mval *v, mval *p, int t, mval *mspace)
+int mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
 {
 	char		buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
 	int4		stat;		/* status */
@@ -72,8 +71,6 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 	MV_FORCE_STR(p);
 	if (mspace)
 		MV_FORCE_STR(mspace);
-	if (0 > t)
-		t = 0;
 	assert((unsigned char)*p->str.addr < n_iops);
 	naml = get_log_name(&v->str, INSERT);
 	if (0 != naml->iod)
@@ -106,7 +103,7 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 	return (stat);
 }
 
-static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspace)
+static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspace)
 {
 	boolean_t	ichset_specified, ochset_specified, filecreated = FALSE;
 	char		*buf, namebuf[LOGNAME_LEN + 1];

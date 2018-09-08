@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -111,15 +111,19 @@
 /* #GTM_THREAD_SAFE : The below macro (MALLOC) is thread-safe because caller ensures serialization with locks */
 #  define MALLOC(size, addr) 										\
 {													\
+	intrpt_state_t  prev_intrpt_state;								\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);									\
-	if ((0 < gtm_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > gtm_max_storalloc))	\
+	if (!gtmSystemMalloc											\
+		&& (0 < gtm_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > gtm_max_storalloc))	\
 	{	/* Boundary check for $gtm_max_storalloc (if set) */					\
 		gtmMallocErrorSize = size;								\
 		gtmMallocErrorCallerid = CALLERID;							\
 		gtmMallocErrorErrno = ERR_MALLOCMAXUNIX;						\
 		raise_gtmmemory_error();								\
 	}												\
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);				\
 	addr = (void *)malloc(size);									\
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);				\
 	if (NULL == (void *)addr)									\
 	{												\
 		gtmMallocErrorSize = size;								\
@@ -305,6 +309,7 @@ GBLDEF unsigned int outOfMemorySmTn;			/* smTN when ran out of memory */
 GBLREF	uint4		gtmDebugLevel;			/* Debug level (0 = using default sm module so with
 							 * a DEBUG build, even level 0 implies basic debugging)
 							 */
+GBLREF	boolean_t	gtmSystemMalloc;		/* Use the system's malloc() instead of our own */
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	gtmMallocDepth;			/* Recursion indicator. Volatile so it gets stored immediately */
 GBLREF	volatile void	*outOfMemoryMitigation;		/* Reserve that we will freed to help cleanup if run out of memory */
@@ -443,6 +448,7 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	char		*ascNum;
 	storElem	*uStor;
 	int		i, sizeIndex, testSize, blockSize, save_errno;
+	intrpt_state_t  prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -515,7 +521,9 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	if (0 < outOfMemoryMitigateSize)
 	{
 		assert(NULL == outOfMemoryMitigation);
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		outOfMemoryMitigation = malloc(outOfMemoryMitigateSize * 1024);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		if (NULL == outOfMemoryMitigation)
 		{
 			save_errno = errno;
@@ -639,14 +647,30 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 	int		sizeIndex, i, hdrSize;
 	unsigned char	*trailerMarker;
 	boolean_t	reentered, was_holder;
+	intrpt_state_t	prev_intrpt_state;
+	void		*rval;
 
+	if (gtmSystemMalloc)
+	{
+		if (0 == size)
+			return &NullStruct.nullStr[0];
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+		rval = malloc(size);
+		if (!rval)
+		{
+			PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);	/* get exclusive thread lock in case threads are in use */
+			raise_gtmmemory_error();
+		}
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+		return rval;
+	}
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
 	 * If it has, we are in the wrong module Jack. This IF is structured so that
 	 * if this is the normal (default/optimized) case we will fall into the code
 	 * and handle the rerouting at the end.
 	 */
-	if (GDL_None == gtmDebugLevel)
+	if (!(gtmDebugLevel & GDL_SmAllMallocDebug))
 	{
 #	endif
 		/* Note that this if is also structured for maximum fallthru. The else will
@@ -789,7 +813,10 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 		}
 #	ifndef DEBUG
 	} else
-	{	/* We have a non-DEBUG module but debugging is turned on so redirect the call to the appropriate module */
+	{	/* We have a non-DEBUG module but debugging is turned on so redirect the call to the appropriate module.
+		 * Stash the caller id for later use, as we can't be sure whether the call to gtm_malloc_dbg() will add
+		 * a stack frame, disrupting later caller_id() requests.
+		 */
 		smCallerId = (unsigned char *)caller_id();
 		return (void *)gtm_malloc_dbg(size);
 	}
@@ -807,7 +834,17 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 	int 		sizeIndex, hdrSize, saveIndex, dqIndex, freedElemCnt;
 	gtm_msize_t	saveSize, allocSize;
 	boolean_t	was_holder;
+	intrpt_state_t	prev_intrpt_state;
 
+	if (gtmSystemMalloc)
+	{
+		if (&NullStruct.nullStr[0] == addr)
+			return;
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+		free(addr);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+		return;
+	}
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
 	 * If it has, we are in the wrong module Jack. This IF is structured so that
@@ -969,7 +1006,8 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 				totalRmalloc -= allocSize;
 				totalAlloc -= allocSize;
 			}
-		}
+		} else
+			saveSize = 0; /* 4SCA: Using the null struct so this isn't important */
 #		ifdef DEBUG
 		/* Make trace entry for this free */
 		++smLastFreeIndex;
@@ -987,6 +1025,8 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 	} else
 	{	/* If not a debug module and debugging is enabled, reroute call to
 		 * the debugging version.
+		 * Stash the caller id for later use, as we can't be sure whether the call to gtm_malloc_dbg() will add
+		 * a stack frame, disrupting later caller_id() requests.
 		 */
 		smCallerId = (unsigned char *)caller_id();
 		gtm_free_dbg(addr);
@@ -1086,6 +1126,8 @@ size_t gtm_bestfitsize(size_t size)
 	int	hdrSize, sizeIndex;
 
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
+	if (gtmSystemMalloc)
+		return size;
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
 	 * If it has, we are in the wrong module Jack. This IF is structured so that
@@ -1248,6 +1290,8 @@ void verifyFreeStorage(void)
 	uint4		i;
 	int		hdrSize;
 
+	if (gtmSystemMalloc)
+		return;
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
 	hdrSize = OFFSETOF(storElem, userStorage);
 	/* Looping for each free queue */
@@ -1279,6 +1323,8 @@ void verifyAllocatedStorage(void)
 	uint4		i;
 	int		hdrSize;
 
+	if (gtmSystemMalloc)
+		return;
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
 	hdrSize = OFFSETOF(storElem, userStorage);
 	/* Looping for MAXINDEX+1 will check the real-malloc'd chains too */

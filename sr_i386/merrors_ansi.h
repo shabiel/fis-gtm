@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,22 +128,22 @@ const static readonly int error_ansi[] = {
 	   0,	/* TRANSMINUS */
 	   0,	/* MAXNRSUBSCRIPTS */
 	  75,	/* MAXSTRLEN */
-	   0,	/* JNLDBERR */
+	   0,	/* ENCRYPTCONFLT2 */
 	   0,	/* JNLFILOPN */
 	   0,	/* MBXRDONLY */
 	   0,	/* JNLINVALID */
 	   0,	/* MBXWRTONLY */
 	   0,	/* MEMORY */
-	  70,	/* MTBLKTOOBIG */
-	  70,	/* MTBLKTOOSM */
-	  70,	/* MTFIXRECSZ */
-	   0,	/* MTIS */
-	   0,	/* MTRDBADBLK */
-	  62,	/* MTRDONLY */
-	   0,	/* MTRDTHENWRT */
-	  71,	/* MTRECGTRBLK */
-	  72,	/* MTRECTOOBIG */
-	  72,	/* MTRECTOOSM */
+	   0,	/* UNUSEDMSG305 */
+	   0,	/* UNUSEDMSG306 */
+	   0,	/* UNUSEDMSG307 */
+	   0,	/* UNUSEDMSG308 */
+	   0,	/* UNUSEDMSG309 */
+	   0,	/* UNUSEDMSG310 */
+	   0,	/* UNUSEDMSG311 */
+	   0,	/* UNUSEDMSG312 */
+	   0,	/* UNUSEDMSG313 */
+	   0,	/* UNUSEDMSG314 */
 	   0,	/* JNLTMQUAL3 */
 	  57,	/* MULTLAB */
 	   0,	/* BLKCNT */
@@ -348,9 +348,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* AMBISYIPARAM */
 	   0,	/* PREVJNLNOEOF */
 	   0,	/* LKSECINIT */
-	   0,	/* MTDOSLAB */
-	   0,	/* MTDOSFOR */
-	   0,	/* MTINVLAB */
+	   0,	/* UNUSEDMSG519 */
+	   0,	/* UNUSEDMSG520 */
+	   0,	/* UNUSEDMSG521 */
 	   0,	/* TXTSRCMAT */
 	   0,	/* CCENOGROUP */
 	   0,	/* BADDBVER */
@@ -373,8 +373,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* NETFAIL */
 	   0,	/* NETLCKFAIL */
 	   0,	/* TTINVFILTER */
-	   0,	/* MTANSILAB */
-	   0,	/* MTANSIFOR */
+	   0,	/* UNUSEDMSG544 */
+	   0,	/* UNUSEDMSG545 */
 	   0,	/* BADTRNPARAM */
 	   0,	/* DSEONLYBGMM */
 	   0,	/* DSEINVLCLUSFN */
@@ -402,7 +402,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CCECLSTPRCS */
 	   0,	/* ZSHOWBADFUNC */
 	   0,	/* NOTALLJNLEN */
-	   0,	/* UNUSEDMSG570 */
+	   0,	/* BADLOCKNEST */
 	   0,	/* NOLBRSRC */
 	   0,	/* INVZSTEP */
 	   0,	/* ZSTEPARG */
@@ -460,7 +460,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* COLLTYPVERSION */
 	   0,	/* LVNULLSUBS */
 	   0,	/* GVREPLERR */
-	   0,	/* MTIOERR */
+	   0,	/* UNUSEDMSG631 */
 	  72,	/* RMWIDTHPOS */
 	  13,	/* OFFSETINV */
 	   0,	/* JOBPARTOOLONG */
@@ -502,7 +502,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CETOOLONG */
 	   0,	/* CENOINDIR */
 	   0,	/* COLLATIONUNDEF */
-	   0,	/* UNUSEDMSG670 */
+	   0,	/* MSTACKCRIT */
 	   0,	/* GTMSECSHRSRVF */
 	   0,	/* FREEZECTRL */
 	   0,	/* JNLFLUSH */
@@ -517,7 +517,7 @@ const static readonly int error_ansi[] = {
 	  80,	/* SOCKINIT */
 	  81,	/* OPENCONN */
 	   0,	/* DEVNOTIMP */
-	   0,	/* JNLEXTR */
+	   0,	/* PATALTER2LARGE */
 	   0,	/* DBREMOTE */
 	   0,	/* JNLREQUIRED */
 	   0,	/* TPMIXUP */
@@ -591,7 +591,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DELIMSIZNA */
 	   0,	/* INVCTLMNE */
 	   0,	/* SOCKLISTEN */
-	   0,	/* LQLENGTHNA */
+	   0,	/* UNUSEDMSG762 */
 	   0,	/* ADDRTOOLONG */
 	   0,	/* GTMSECSHRGETSEMFAIL */
 	   0,	/* CPBEYALLOC */
@@ -608,7 +608,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MEMORYRECURSIVE */
 	   0,	/* FREEZEID */
 	   0,	/* BLKWRITERR */
-	   0,	/* UNUSEDMSG776 */
+	   0,	/* UNUSEDMSG779 */
 	   0,	/* PINENTRYERR */
 	   0,	/* BCKUPBUFLUSH */
 	   0,	/* NOFORKCORE */
@@ -654,7 +654,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUNOFINISH */
 	   0,	/* DBFILEXT */
 	   0,	/* JNLFSYNCERR */
-	   0,	/* FSYNCTIMOUT */
+	   0,	/* ICUNOTENABLED */
 	   0,	/* ZCPREALLVALINV */
 	   0,	/* NEWJNLFILECREAT */
 	   0,	/* DSKSPACEFLOW */
@@ -1148,7 +1148,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CRYPTDLNOOPEN */
 	   0,	/* CRYPTNOV4 */
 	   0,	/* CRYPTNOMM */
-	   0,	/* UNUSEDMSG1316 */
+	   0,	/* READONLYNOBG */
 	   0,	/* CRYPTKEYFETCHFAILED */
 	   0,	/* CRYPTKEYFETCHFAILEDNF */
 	   0,	/* CRYPTHASHGENFAILED */
@@ -1206,7 +1206,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUUSERLBK */
 	   0,	/* SETINSETTRIGONLY */
 	   0,	/* DZTRIGINTRIG */
-	   0,	/* UNUSEDMSG1374 */
+	   0,	/* LSINSERTED */
 	   0,	/* BOOLSIDEFFECT */
 	   0,	/* DBBADUPGRDSTATE */
 	   0,	/* WRITEWAITPID */
@@ -1218,7 +1218,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLORDBFLU */
 	   0,	/* ZCCLNUPRTNMISNG */
 	   0,	/* ZCINVALIDKEYWORD */
-	   0,	/* UNUSEDMSG1386 */
+	   0,	/* REPLMULTINSTUPDATE */
 	   0,	/* DBSHMNAMEDIFF */
 	   0,	/* SHMREMOVED */
 	   0,	/* DEVICEWRITEONLY */
@@ -1359,7 +1359,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GETNAMEINFO */
 	   0,	/* SOCKBIND */
 	   0,	/* INSTFRZDEFER */
-	   0,	/* UNUSEDMSG1529 */
+	   0,	/* UNUSEDMSG1532 */
 	   0,	/* REGOPENFAIL */
 	   0,	/* REPLINSTNOSHM */
 	   0,	/* DEVPARMTOOSMALL */
@@ -1369,7 +1369,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GBLNOMAPTOREG */
 	   0,	/* ISSPANGBL */
 	   0,	/* TPNOSUPPORT */
-	   0,	/* UNUSEDMSG1539 */
+	   0,	/* UNUSEDMSG1542 */
 	   0,	/* ZATRANSERR */
 	   0,	/* FILTERTIMEDOUT */
 	   0,	/* TLSDLLNOOPEN */
@@ -1491,4 +1491,24 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLSWITCHRETRY */
 	   0,	/* JNLSWITCHFAIL */
 	   0,	/* CLISTRTOOLONG */
+	   0,	/* LVMONBADVAL */
+	   0,	/* RESTRICTEDOP */
+	   0,	/* RESTRICTSYNTAX */
+	   0,	/* MUCREFILERR */
+	   0,	/* JNLBUFFPHS2SALVAGE */
+	   0,	/* JNLPOOLPHS2SALVAGE */
+	   0,	/* MURNDWNARGLESS */
+	   0,	/* DBFREEZEON */
+	   0,	/* DBFREEZEOFF */
+	   0,	/* STPCRIT */
+	   0,	/* STPOFLOW */
+	   0,	/* SYSUTILCONF */
+	   0,	/* MSTACKSZNA */
+	   0,	/* JNLEXTRCTSEQNO */
+	   0,	/* INVSEQNOQUAL */
+	   0,	/* LOWSPC */
+	   0,	/* FAILEDRECCOUNT */
+	   0,	/* LOADRECCNT */
+	   0,	/* COMMFILTERERR */
+	   0,	/* NOFILTERNEST */
 	};
