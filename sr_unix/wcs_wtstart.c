@@ -657,9 +657,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				if (!do_asyncio)
 				{
 					DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset, save_bp, size, save_errno);
-				}
-#ifndef __CYGWIN__
-                else
+				} else
 				{
 					cr->wip_is_encr_buf = (save_bp != bp);
 					DB_LSEEKWRITEASYNCSTART(csa, udi, udi->fn, udi->fd, offset, save_bp, size, cr, save_errno);
@@ -677,7 +675,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 					} else if (0 == save_errno)
 						csr->aio_issued = TRUE;
 				}
-#endif
 			}
 			if ((blk_hdr_ptr_t)reformat_buffer == bp)
 			{

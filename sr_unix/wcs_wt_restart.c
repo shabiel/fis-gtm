@@ -51,7 +51,6 @@ int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
 		save_bp = bp;
 	else
 		save_bp = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(bp, csa);
-#ifndef __CYGWIN__
 	DB_LSEEKWRITEASYNCRESTART(csa, udi, udi->fn, udi->fd, save_bp, csr, save_errno);
 	assert(0 == save_errno IF_LIBAIO(|| EAGAIN  == save_errno));
 	if (0 == save_errno)
@@ -79,10 +78,6 @@ int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
 			save_errno = 0;
 		}
 	}
-#else
-    save_errno = 0;
-#endif
-
 	return save_errno;
 }
 

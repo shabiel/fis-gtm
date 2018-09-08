@@ -718,11 +718,9 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		 * shared memory OR closing the file descriptor (udi->fd) as the in-progress asyncio buffers/fd point there.
 		 */
 #		ifndef USE_LIBAIO
-#       ifndef __CYGWIN__
 		WAIT_FOR_AIO_TO_BE_DONE(udi->fd, aiocancel_timedout);
 		if (aiocancel_timedout)
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_AIOCANCELTIMEOUT, 3, process_id, DB_LEN_STR(reg));
-#       endif /* __CYGWIN __ */
 #		else
 		/* Here, aio_shim_destroy() will destroy the thread and the kernel context associated with the entire global
 		 * directory -- so this effectively cancels all in-progress IOs to all subsequent regions that are about to

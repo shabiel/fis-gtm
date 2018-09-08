@@ -45,9 +45,7 @@ void wcs_wtfini_nocrit(gd_region *reg, wtstart_cr_list_t *cr_list_ptr)
 		cr = *crptr;
 		for (lcnt = 1; cr->dirty && (cr->epid == process_id); lcnt++)
 		{	/* dirty, i/o has been issued by our process and there is no i/o status available yet */
-#           ifndef __CYGWIN__
 			AIO_SHIM_ERROR(&cr->aiocb, ret);
-#           endif
 			if (EINPROGRESS != ret)
 				break;
 			if (0 == lcnt % SLEEP_ONE_MIN)

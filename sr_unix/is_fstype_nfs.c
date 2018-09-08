@@ -35,7 +35,7 @@ boolean_t is_fstype_nfs(int fd)
 	is_nfs = FALSE;
 	if (0 != fstatfs(fd, &buf))
 		return is_nfs;
-#	if defined(__linux__) || defined(__CYGWIN__)
+#	if defined(__linux__)
 	is_nfs = (NFS_SUPER_MAGIC == buf.f_type);
 #	elif defined(_AIX)
 	is_nfs = (MNT_NFS == buf.f_vfstype);
