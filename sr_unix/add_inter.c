@@ -63,7 +63,7 @@ int4	add_inter(int val, sm_int_ptr_t addr, sm_global_latch_ptr_t latch)
 			assert(0 == OFFSETOF(global_latch_t, u.parts.latch_pid));
 #			if defined(_AIX)
 			cswpsuccess = compswap_unlock(RECAST(sm_global_latch_ptr_t)cntrval_p, cntrval, newcntrval);
-#			elif defined(__linux__)
+#			elif defined(__linux__) || defined(__CYGWIN__)
 			cswpsuccess = compswap((sm_global_latch_ptr_t)cntrval_p, cntrval, newcntrval);
 #			else
 #			error "Don't know how to compswap on this platform"

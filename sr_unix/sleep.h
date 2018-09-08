@@ -31,7 +31,7 @@ void m_usleep(int useconds);
 #   endif
 #endif
 
-#if defined(__MVS__) || defined(__CYGWIN__) || defined(__hpux) || defined(_AIX)
+#if defined(__MVS__) || defined(__hpux) || defined(_AIX)
 /* For HP-UX the clock_* seem to be missing; for AIX the accuracy of clock_* is currently poor */
 #define SET_EXPIR_TIME(NOW_TIMEVAL, EXPIR_TIMEVAL, SECS, USECS)				\
 MBSTART {										\
@@ -64,7 +64,7 @@ MBSTART {										\
 		USECS = (int)((EXPIR_TIMEVAL).tv_usec - (NOW_TIMEVAL).tv_usec);		\
 	}										\
 
-#if defined(__MVS__) || defined(__CYGWIN__)
+#if defined(__MVS__)
 /* On z/OS neither clock_nanosleep nor nanosleep is available, so use a combination of sleep, usleep, and gettimeofday instead.
  * Since we do not have a z/OS box presently, this implementation has not been tested, and so it likely needs some casts at the very
  * least. Another note is that sleep is unsafe to mix with timers on other platforms, but on z/OS the documentation does not mention
@@ -106,7 +106,7 @@ MBSTART {										\
 		}									\
 	}										\
 } MBEND
-#else
+#else /* defined(__MVS__) */
 
 /* For most UNIX platforms a combination of nanosleep() and gettimeofday() proved to be the most supported, accurate, and
  * operationally sound approach. Alternatives for implementing high-resolution sleeps include clock_nanosleep() and nsleep()
@@ -132,14 +132,15 @@ MBSTART {										\
 	} else										\
 		nanosleep(&req, NULL);							\
 } MBEND
-#endif
+#endif /* defined(__MVS__) */
 
 # define NANOSLEEP(NANOSECONDS, RESTART)						\
 MBSTART {										\
 	SLEEP_USEC((1000 > (NANOSECONDS)) ? 1 : ((NANOSECONDS) / 1000), RESTART);	\
 } MBEND
-#endif
-#if !defined(__MVS__) && !defined(__CYGWIN__) && !defined(__hpux)
+#endif /* defined(__MVS__) || defined(__hpux) || defined(_AIX) */
+
+#if !defined(__MVS__) && !defined(__hpux)
 /* Nonetheless, because we continue to press for the highest time discrimination available, where posible we use
  * clock_nanosleep and clock_gettime, which, while currently no faster than gettimeofday(), do eventually promise
  * sub-millisecond accuracy
