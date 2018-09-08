@@ -139,13 +139,11 @@ int resolve_ref(int errknt)
 #			ifndef i386
 			if (!run_time && !(cmd_qlf.qlf & CQ_DYNAMIC_LITERALS))
 			{
-#			endif
 				if ((OC_FNTEXT == curtrip->opcode) && (resolve_optimize(curtrip)))
 				{ /* resolve_optimize now only deals with $TEXT(), but could do more by removing 1st term below */
 					curtrip = curtrip->exorder.bl;	/* Backup to rescan after changing curtrip */
 					continue;
 				}
-#			ifndef i386
 			}
 #			endif
 			for (opnd = curtrip->operand; opnd < ARRAYTOP(curtrip->operand); opnd++)
