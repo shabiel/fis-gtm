@@ -44,6 +44,7 @@
 	set platform("Linux","x86")="LinuxOnX8632"
 	set platform("Linux","x86_64")="LinuxOnX8664"
 	set platform("Solaris","SPARC")="SolarisOnSPARC"
+	set platform("CYGWIN","x86")="CygwinOnX8632"
 	;
 	; Note AIX comments handled separated as their comments are the same as C.
 	;
@@ -51,6 +52,7 @@
 	set commentchar("LinuxOnX8632")="#"
 	set commentchar("LinuxOnX8664")="#"
 	set commentchar("SolarisOnSPARC")="!"
+	set commentchar("CygwinOnX8632")="#"
 	set gtmzv=$ZVersion
 	set gtmos=$ZPiece(gtmzv," ",3)
 	set gtmhdwr=$ZPiece(gtmzv," ",4)
@@ -192,6 +194,14 @@ formatrecforLinuxOnX8664(varname,offorlen)
 ; Routine to format record for Solaris SPARC
 ;
 formatrecforSolarisOnSPARC(varname,offorlen)
+	use outfile
+	write "#define ",varname,?(maxvarlen+8)," ",offorlen,!
+	use infile
+	quit
+;
+; Routine for format record for Cygwin x86
+;
+formatrecforCygwinOnX8632(varname,offorlen)
 	use outfile
 	write "#define ",varname,?(maxvarlen+8)," ",offorlen,!
 	use infile

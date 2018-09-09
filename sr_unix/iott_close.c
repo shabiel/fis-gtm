@@ -94,6 +94,11 @@ void iott_close(io_desc *v, mval *pp)
 		free(v->dollar.devicebuffer);
 		v->dollar.devicebuffer = NULL;
 	}
+	if (v->dollar.devicebuffer)
+	{
+		free(v->dollar.devicebuffer);
+		v->dollar.devicebuffer = NULL;
+	}
 	REVERT_GTMIO_CH(&v->pair, ch_set);
 	return;
 }

@@ -317,6 +317,10 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						 * 	fixed part from the indefinite part.
 						 */
 						split_atom = TRUE;
+						if ((count >= (MAX_PATTERN_ATOMS - 1)) ||
+								(atom_map >= (MAX_PATTERN_ATOMS -2)))
+			                         	return ERR_PATMAXLEN;
+
 					} else
 					{
 						infinite = TRUE;

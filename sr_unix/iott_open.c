@@ -199,6 +199,20 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				tt_ptr->mask_term.mask[0] = TERM_MSK;
 			tt_ptr->default_mask_term = TRUE;
 		}
+	} else
+	{
+		/* Set terminal mask on the already open terminal, if CHSET changes */
+		if (old_ichset != ioptr->ichset)
+		{
+			memset(&tt_ptr->mask_term.mask[0], 0, SIZEOF(io_termmask));
+			if (CHSET_M != ioptr->ichset)
+			{
+				tt_ptr->mask_term.mask[0] = TERM_MSK_UTF8_0;
+				tt_ptr->mask_term.mask[4] = TERM_MSK_UTF8_4;
+			} else
+				tt_ptr->mask_term.mask[0] = TERM_MSK;
+			tt_ptr->default_mask_term = TRUE;
+		}
 	}
 	REVERT_GTMIO_CH(&ioptr->pair, ch_set);
 	return TRUE;
