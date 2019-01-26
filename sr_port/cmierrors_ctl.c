@@ -50,11 +50,6 @@ LITDEF	int cmierrors_undocarr[] = {
 };
 
 
-
-LITDEF	int cmierrors_undocarr[] = {
-};
-
-
 GBLDEF	err_ctl cmierrors_ctl = {
 	250,
 	"CMI",
@@ -63,4 +58,3 @@ GBLDEF	err_ctl cmierrors_ctl = {
 	&cmierrors_undocarr[0],
 	0
 };
-
