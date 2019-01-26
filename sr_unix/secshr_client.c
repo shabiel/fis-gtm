@@ -449,7 +449,7 @@ int create_server(void)
 		/* Do exec using gtmsecshr_path, which was initialize in file check code - send_mesg2gtmsecshr */
 		if (WBTEST_ENABLED(WBTEST_BADEXEC_SECSHR_PROCESS))
 			STRCPY(gtmsecshr_path, "");
-		status = EXECL(gtmsecshr_path, gtmsecshr_path, 0);
+		status = EXECL(gtmsecshr_path, gtmsecshr_path, NULL);
 		if (-1 == status)
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
