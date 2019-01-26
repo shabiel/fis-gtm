@@ -6,11 +6,11 @@
 
 #include "error.h"
 
-void main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
   condition_handler ch;
 
-  printf("sizeof chnd = %d, jmp_buf offset = %d\n",
+  printf("sizeof chnd = %ld, jmp_buf offset = %ld\n",
                 sizeof(ch), offsetof(condition_handler, jmp));
   exit(0);
 }
