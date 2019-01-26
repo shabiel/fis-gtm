@@ -37,8 +37,19 @@ MBSTART {							\
 #define	ICU_LIBFLAGS		(RTLD_NOW | RTLD_GLOBAL)
 
 #define	ICU_LIBNAME_ROOT	"libicuio"
+
+#ifdef __CYGWIN__
+#define YOTTADB_IMAGE_NAME	"cygyottadb.dll"
+#else
 #define YOTTADB_IMAGE_NAME	"libyottadb.so"
-#define	ICU_LIBNAME_EXT		"so"
+#endif
+
+#ifdef __CYGWIN__
+#define	ICU_LIBNAME_EXT		"dll"
+#else
+#define ICU_LIBNAME_EXT		"so"
+#endif
+
 #define	ICU_LIBNAME		ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT
 
 #define GTM_MAIN_FUNC		"gtm_main"

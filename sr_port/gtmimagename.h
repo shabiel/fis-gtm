@@ -59,6 +59,10 @@ GBLREF	boolean_t		run_time;	/* needed by IS_MCODE_RUNNING macro */
 #define	IS_LIBCMISOCKETTCP	(IS_MUMPS_IMAGE || IS_LKE_IMAGE || IS_GTCM_GNP_SERVER_IMAGE)
 #define	IS_LIBGTCM		(IS_GTCM_SERVER_IMAGE || IS_GTCM_SHMCLEAN_IMAGE)
 
+#ifdef __CYGWIN__
+#define LIBYOTTADBDOTSO		"%s/cygyottadb.dll"
+#else
 #define LIBYOTTADBDOTSO		"%s/libyottadb.so"
+#endif
 
 #endif
