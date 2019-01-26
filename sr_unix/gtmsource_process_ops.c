@@ -429,7 +429,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 	SETUP_THREADGBL_ACCESS;
 	status = SS_NORMAL;
 	assert(remote_side == &jnlpool->gtmsource_local->remote_side);
-	DEBUG_ONLY(*msg_type = -1);
+	*msg_type = -1;	/* initialize to indicate we have not yet received any messages */
 	for (log_waitmsg = TRUE; SS_NORMAL == status; )
 	{
 		if (log_waitmsg)
@@ -443,7 +443,14 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 		DEBUG_ONLY(remote_side_endianness_known = remote_side->endianness_known);
 		if (SS_NORMAL != status)
 			break;
-		if (REPL_LOGFILE_INFO == msg.type) /* No need to endian convert as the receiver converts this to our native fmt */
+		/* If we had already received a message (*msg_type is not -1) then check if we are seeing a
+		 * REPL_LOGFILE_INFO message. If so that can be handled specially below.
+		 * Also, no need to endian convert this particular message as the receiver converts this to our native format.
+		 */
+		assert((REPL_LOGFILE_INFO != msg.type) || (-1 != *msg_type));	/* In pro, we handle this by falling through below
+										 * to code that treats this as an unknown message.
+										 */
+		if ((-1 != *msg_type) && (REPL_LOGFILE_INFO == msg.type))
 		{	/* We received a REPL_START_JNL_SEQNO/REPL_FETCH_RESYNC and coming through the loop again
 			 * to receive REPL_LOGFILE_INFO. At this point, we should have already established the endianness
 			 * of the remote side and even if the remote side is of different endianness, we are going to interpret the
@@ -475,8 +482,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Remote side rollback path is %s; Rollback PID = %d\n",
 						logfile_msg.fullpath, logfile_msg.pid);
-			}
-			else
+			} else
 			{
 				assert(REPL_START_JNL_SEQNO == *msg_type);
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Remote side receiver log file path is %s; "
@@ -581,13 +587,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n",
 				this_side->jnl_ver, remote_side->jnl_ver);
 			repl_check_jnlver_compat(!remote_side->cross_endian);
-			assert(remote_side->jnl_ver > V15_JNL_VER || 0 == (*start_flags & START_FLAG_COLL_M));
-			if (remote_side->jnl_ver <= V15_JNL_VER)
-				*start_flags &= ~START_FLAG_COLL_M; /* zap it for pro, just in case */
 			remote_side->is_std_null_coll = (*start_flags & START_FLAG_COLL_M) ? TRUE : FALSE;
-			assert((remote_side->jnl_ver >= V19_JNL_VER) || (0 == (*start_flags & START_FLAG_TRIGGER_SUPPORT)));
-			if (remote_side->jnl_ver < V19_JNL_VER)
-				*start_flags &= ~START_FLAG_TRIGGER_SUPPORT; /* zap it for pro, just in case */
 			remote_side->trigger_supported = (*start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE : FALSE;
 #			ifdef GTM_TRIGGER
 			if (!remote_side->trigger_supported)
@@ -1003,6 +1003,7 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int			status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	char			err_string[1024];
+	gtmsource_local_ptr_t	gtmsource_local;
 
 	assert((REPL_MULTISITE_MSG_START > msg->type) || (REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver));
 	if (MAX_SEQNO != optional_seqno)
@@ -1024,22 +1025,32 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 	/* Check for error status from the REPL_SEND */
 	if (SS_NORMAL != status)
 	{
-		if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
-		{
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while sending %s. Status = %d ; %s\n",
-					msgtypestr, status, STRERROR(status));
-			repl_close(&gtmsource_sock_fd);
-			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-			gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
-			return;
-		}
+		assert((EREPL_SEND == repl_errno) || (EREPL_SELECT == repl_errno));
 		if (EREPL_SEND == repl_errno)
 		{
-			SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
-				"Error in send : %s", msgtypestr, STRERROR(status));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
-		}
-		if (EREPL_SELECT == repl_errno)
+#			ifdef GTM_TLS
+			if (ERR_TLSIOERROR == status)
+			{
+				gtmsource_local = jnlpool->gtmsource_local;	/* needed by GTMSOURCE_HANDLE_TLSIOERROR */
+				GTMSOURCE_HANDLE_TLSIOERROR("send");
+				return;
+			} else
+#			endif
+			if (REPL_CONN_RESET(status))
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while sending %s. Status = %d ; %s\n",
+						msgtypestr, status, STRERROR(status));
+				repl_close(&gtmsource_sock_fd);
+				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
+				gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+				return;
+			} else
+			{
+				SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
+					"Error in send : %s", msgtypestr, STRERROR(status));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
+			}
+		} else if (EREPL_SELECT == repl_errno)
 		{
 			SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
 				"Error in select : %s", msgtypestr, STRERROR(status));
@@ -1069,6 +1080,7 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 	char			err_string[1024];
 	unsigned char		*buff;
 	int4			bufflen;
+	gtmsource_local_ptr_t	gtmsource_local;
 
 	repl_log(gtmsource_log_fp, TRUE, FALSE, "Waiting for %s message\n", msgtypestr);
 	assert((REPL_XOFF != msgtype) && (REPL_XON != msgtype) && (REPL_XOFF_ACK_ME != msgtype));
@@ -1100,6 +1112,14 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 		{
 			if (EREPL_RECV == repl_errno)
 			{
+#				ifdef GTM_TLS
+				if (ERR_TLSIOERROR == status)
+				{
+					gtmsource_local = jnlpool->gtmsource_local;	/* needed by GTMSOURCE_HANDLE_TLSIOERROR */
+					GTMSOURCE_HANDLE_TLSIOERROR("recv");
+					return FALSE;
+				} else
+#				endif
 				if (REPL_CONN_RESET(status))
 				{	/* Connection reset */
 					repl_log(gtmsource_log_fp, TRUE, TRUE,

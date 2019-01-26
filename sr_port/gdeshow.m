@@ -3,6 +3,9 @@
 ; Copyright (c) 2001-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -34,7 +37,7 @@ cfilefail:
 	q
 NAME
 	n namsdisp,namedispmaxlen
-	i '$d(nams(NAME)) zm gdeerr("OBJNOTFND"):"Name":$$namedisp(NAME,0) q
+	i '$d(nams(NAME)) d message^GDE(gdeerr("OBJNOTFND"),"""Name"":"_$zwrite($$namedisp(NAME,0))) q
 	d n2calc,n2
 	i log s BOL="!" u @uself w BOL d n2 w ! u @useio s BOL=""
 	q
@@ -76,7 +79,7 @@ namec:
 	w !,BOL
 	q
 GBLNAME
-	i '$d(gnams(GBLNAME)) zm gdeerr("OBJNOTFND"):"Global Name":GBLNAME q
+	i '$d(gnams(GBLNAME)) d message^GDE(gdeerr("OBJNOTFND"),"""Global Name"":"_$zwrite(GBLNAME)) q
 	d gn2
 	i log s BOL="!" u @uself w BOL d gn2 w ! u @useio s BOL=""
 	q
@@ -118,7 +121,7 @@ instc:
 	w !,BOL
 	q
 REGION
-	i '$d(regs(REGION)) zm gdeerr("OBJNOTFND"):"Region":REGION q
+	i '$d(regs(REGION)) d message^GDE(gdeerr("OBJNOTFND"),"""Region"":"_$zwrite(REGION)) q
 	d r2
 	i log s BOL="!" u @uself w BOL d r2 w ! u @useio s BOL=""
 	q
@@ -148,7 +151,7 @@ onereg:
 	w ?x(11),$s(regs(s,"EPOCHTAPER"):"Y",1:"N")
 	w ?x(12),$s(regs(s,"AUTODB"):"Y",1:"N")
 	w ?x(13),$s(regs(s,"STATS"):"Y",1:"N")
-	w ?x(14),$s(regs(s,"LOCK_CRIT"):"Sep",1:"DB")
+	w ?x(14),$s(regs(s,"LOCK_CRIT_SEPARATE"):"Sep",1:"DB")
 	q
 onejnl:
 	w !,BOL,?x(1),s,?x(2),$s($zl(regs(s,"FILE_NAME")):$$namedisp(regs(s,"FILE_NAME"),1),1:"<based on DB file-spec>")
@@ -209,7 +212,7 @@ qualadd:(prefix,delim,qual,val)
 	e  w prefix_delim_q_"="_val
 	q
 SEGMENT
-	i '$d(segs(SEGMENT)) zm gdeerr("OBJNOTFND"):"Segment":SEGMENT q
+	i '$d(segs(SEGMENT)) d message^GDE(gdeerr("OBJNOTFND"),"""Segment"":"_$zwrite(SEGMENT)) q
 	d s2
 	i log s BOL="!" u @uself w BOL d s2 w ! u @useio s BOL=""
 	q
@@ -271,7 +274,7 @@ segmentc:
 MAP
 	n map,mapdisp,mapdispmaxlen
 	i '$d(mapreg) n mapreg s mapreg=""
-	e  i '$d(regs(mapreg)) zm gdeerr("OBJNOTFND"):"Region":mapreg q
+	e  i '$d(regs(mapreg)) d message^GDE(gdeerr("OBJNOTFND"),"""Region"":"_$zwrite(mapreg)) q
 	d NAM2MAP^GDEMAP,m1
 	i log s BOL="!" u @uself w BOL d m1 w ! u @useio s BOL=""
 	q
@@ -314,7 +317,7 @@ t1:	d tmpreghd
 	w ?x(11),$s(tmpreg("EPOCHTAPER"):"Y",1:"N")
 	w ?x(12),$s(tmpreg("AUTODB"):"Y",1:"N")
 	w ?x(13),$s(tmpreg("STATS"):"Y",1:"N")
-	w ?x(14),$s(tmpreg("LOCK_CRIT"):"Sep",1:"DB")
+	w ?x(14),$s(tmpreg("LOCK_CRIT_SEPARATE"):"Sep",1:"DB")
 	i tmpreg("JOURNAL") d tmpjnlhd,tmpjnlbd
 	d tmpseghd
 	w !,BOL,?x(1),"<default>"

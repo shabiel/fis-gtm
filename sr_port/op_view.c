@@ -62,7 +62,6 @@
 #include "targ_alloc.h"
 #include "gvcst_protos.h"
 #ifdef GTM_TRIGGER
-# include "rtnhdr.h"		/* For rtn_tabent in gv_trigger.h */
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
 #endif
@@ -180,7 +179,7 @@ void	op_view(int numarg, mval *keyword, ...)
 	lv_val			*lv, *lvp, *lvp_top;
 	lvmon_var		*lvmon_var_p, *lvmon_vars_base;
 	mstr			tmpstr;
-	mval			*arg, *nextarg, outval;
+	mval			*arg, *nextarg, outval, *arg2;
 	noisolation_element	*gvnh_entry;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -193,6 +192,8 @@ void	op_view(int numarg, mval *keyword, ...)
 	open_relinkctl_sgm	*linkctl;
 	relinkrec_t		*linkrec;
 #	endif
+	char			*envvarname, *envvarvalue;
+	int			save_errno;
 	static readonly char msg1[] = "Caution: Database Block Certification Has Been ";
 	static readonly char lv_msg1[] =
 		"Caution: GT.M reserved local variable string pointer duplicate check diagnostic has been";
@@ -404,6 +405,62 @@ void	op_view(int numarg, mval *keyword, ...)
 					}
 				}
 			}
+			break;
+		case VTK_SETENV:
+			assert(NULL != arg);	/* arg contains the name of the environment variable */
+			if (arg->str.len)
+			{
+				if (2 > numarg)
+				{	/* There should be 2 parameters specified (1 for env var name, 1 for value).
+					 * If not error out. In case more than 2 parameters are specified, the rest are ignored.
+					 */
+					rts_error_csa(CSA_ARG(NULL)
+						VARLSTCNT(4) ERR_VIEWARGCNT, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
+				}
+				/* Set up the env var name first */
+				envvarname = malloc(arg->str.len + 1);	/* + 1 for null terminated string, needed by "setenv" */
+				memcpy(envvarname, arg->str.addr, arg->str.len);
+				envvarname[arg->str.len] = '\0';
+				/* Set up the env var value next */
+				arg2 = va_arg(var, mval *);
+				MV_FORCE_STR(arg2);
+				envvarvalue = malloc(arg2->str.len + 1); /* + 1 for null terminated string, needed by "setenv" */
+				if (arg2->str.len)
+					memcpy(envvarvalue, arg2->str.addr, arg2->str.len);
+				envvarvalue[arg2->str.len] = '\0';
+				status = setenv(envvarname, envvarvalue, TRUE);
+				if (-1 == status)
+				{
+					save_errno = errno;
+					free(envvarname);
+					free(envvarvalue);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_SETENVFAIL, 2, arg->str.len, arg->str.addr,
+							ERR_SYSCALL, 5, RTS_ERROR_LITERAL("setenv()"), CALLFROM, save_errno);
+				}
+				free(envvarname);
+				free(envvarvalue);
+			}
+			/* else: Do nothing if an empty (0-length) env var name has been specified */
+			break;
+		case VTK_UNSETENV:
+			assert(NULL != arg);
+			if (arg->str.len)
+			{
+				/* Set up the env var name first */
+				envvarname = malloc(arg->str.len + 1);	/* + 1 for null terminated string, needed by "unsetenv" */
+				memcpy(envvarname, arg->str.addr, arg->str.len);
+				envvarname[arg->str.len] = '\0';
+				status = unsetenv(envvarname);
+				if (-1 == status)
+				{
+					save_errno = errno;
+					free(envvarname);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_UNSETENVFAIL, 2, arg->str.len, arg->str.addr,
+							ERR_SYSCALL, 5, RTS_ERROR_LITERAL("unsetenv()"), CALLFROM, save_errno);
+				}
+				free(envvarname);
+			}
+			/* else: Do nothing if an empty (0-length) env var name has been specified */
 			break;
 		case VTK_YCHKCOLL:
 			if (arg)
@@ -851,7 +908,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			break;
 		default:
 			va_end(var);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWCMD, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWCMD, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 	}
 	va_end(var);
 	return;

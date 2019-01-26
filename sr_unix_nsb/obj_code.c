@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,7 +24,6 @@
 
 #include "compiler.h"
 #include "obj_gen.h"
-#include <rtnhdr.h>
 #include "cmd_qlf.h"
 #include "cgp.h"
 #ifdef UNIX
@@ -50,7 +52,7 @@ GBLREF spdesc			stringpool;
 GBLREF char			cg_phase;	/* code generation phase */
 GBLREF char			cg_phase_last;	/* previous code generation phase */
 GBLREF int4			curr_addr, code_size;
-GBLREF char			object_file_name[];
+GBLREF unsigned char		object_file_name[];
 GBLREF int			object_file_des;
 
 error_def(ERR_SYSCALL);

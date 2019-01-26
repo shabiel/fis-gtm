@@ -35,7 +35,6 @@
 #ifdef UNIX			/* needed for frame_pointer in GVCST_ROOT_SEARCH_AND_PREP macro */
 # include "repl_msg.h"
 # include "gtmsource.h"
-# include "rtnhdr.h"
 # include "stack_frame.h"
 # include "wbox_test_init.h"
 #endif
@@ -75,7 +74,9 @@ boolean_t	gvcst_order(void)
 	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	int		end, prev, oldend;
 	int		save_dollar_tlevel;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	found = gvcst_order2();
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_order, (gtm_uint64_t) 1);

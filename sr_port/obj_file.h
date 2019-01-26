@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +15,8 @@
 #ifndef OBJ_FILE_INCLUDED
 #define OBJ_FILE_INCLUDED
 
-#include <obj_filesp.h>
+#include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
+#include <obj_filesp.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 
 #define OUTPUT_SYMBOL_SIZE (SIZEOF(int4) + sym_table_size)
 #define PADCHARS	"PADDING PADDING"
@@ -37,8 +41,8 @@ struct inst_count
 
 /* Prototypes */
 #ifdef UNIX
-int mk_tmp_object_file(const char *object_fname, int object_fname_len);
-void rename_tmp_object_file(const char *object_fname);
+int mk_tmp_object_file(const unsigned char *object_fname, int object_fname_len);
+void rename_tmp_object_file(const unsigned char *object_fname);
 void init_object_file_name(void);
 void finish_object_file(void);
 #endif

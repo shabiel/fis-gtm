@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -234,6 +237,7 @@ void	mur_extract_null(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *
 	EXTPID(plst);
 	EXTQW(rec->jrec_null.jnl_seqno);
 	EXT_STRM_SEQNO(rec->jrec_null.strm_seqno);
+	EXTINT(rec->jrec_null.bitmask.salvaged);
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
@@ -271,9 +275,17 @@ void	mur_extract_blk(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 	EXTPID(plst);
 	EXTINT(rec->jrec_pblk.blknum);
 	EXTINT(rec->jrec_pblk.bsiz);
-	memcpy((char*)&pblk_head, (char*)&rec->jrec_pblk.blk_contents[0], SIZEOF(blk_hdr));
+	memcpy((char *)&pblk_head, (char *)&rec->jrec_pblk.blk_contents[0], SIZEOF(blk_hdr));
 	EXTQW(pblk_head.tn);
 	EXTINT(rec->jrec_pblk.ondsk_blkver);
+	assert((JRT_PBLK == rec->prefix.jrec_type) || (JRT_AIMG == rec->prefix.jrec_type));
+	if (JRT_AIMG == rec->prefix.jrec_type)
+	{	/* Also extract the DSE COMMAND that caused the AIMG record */
+		ptr = &murgbl.extr_buff[extract_len];
+		memcpy(ptr, &rec->jrec_aimg.blk_contents[rec->jrec_aimg.bsiz], rec->jrec_aimg.cmdstrlen);
+		extract_len += rec->jrec_aimg.cmdstrlen;
+		murgbl.extr_buff[extract_len++] = '\\';
+	}
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 

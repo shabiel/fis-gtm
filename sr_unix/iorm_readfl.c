@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -83,7 +86,9 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
 	io_desc         *iod;
 	d_rm_struct	*rm_ptr;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(0 <= datalen);
 	iod = io_curr_device.in;
 	ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
@@ -404,8 +409,8 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 		PIPE_DEBUG(PRINTF("piperfl: .. mv_stent found - bytes_read: %d max_bufflen: %d"
 				  "  interrupts: %d\n", bytes_read, exp_width, TREF(pipefifo_interrupt)); DEBUGPIPEFLUSH);
 		PIPE_DEBUG(PRINTF("piperfl: .. timeout: %d\n", msec_timeout); DEBUGPIPEFLUSH);
-		PIPE_DEBUG(if (pipeintr->end_time_valid) PRINTF("piperfl: .. endtime: %d/%d\n", end_time.at_sec,
-								end_time.at_usec); DEBUGPIPEFLUSH);
+		PIPE_DEBUG(if (pipeintr->end_time_valid) PRINTF("piperfl: .. endtime: %d/%d\n", end_time.tv_sec,
+								end_time.tv_nsec / NANOSECS_IN_USEC); DEBUGPIPEFLUSH);
 		PIPE_DEBUG(PRINTF("piperfl: .. buffer address: 0x%08lx  stringpool: 0x%08lx\n",
 				  buffer_start, stringpool.free); DEBUGPIPEFLUSH);
 		PIPE_DEBUG(PRINTF("buffer_start =%s\n", buffer_start); DEBUGPIPEFLUSH);
@@ -479,13 +484,13 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			{	/* Compute appropriate msec_timeout using end_time from restart data. */
 				end_time = pipeintr->end_time;	/* Restore end_time for timeout */
 				cur_time = sub_abs_time(&end_time, &cur_time);
-				if (0 > cur_time.at_sec)
+				if (0 > cur_time.tv_sec)
 				{
 					msec_timeout = -1;
 					out_of_time = TRUE;
 				} else
-					msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
-							      DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+					msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
+							      DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
 				if (rm_ptr->follow && !out_of_time && !msec_timeout)
 					msec_timeout = 1;
 				PIPE_DEBUG(PRINTF("piperfl: Taking timeout end time from read restart data - "
@@ -542,13 +547,13 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						/* get the current time */
 						sys_get_curr_time(&current_time);
 						time_left = sub_abs_time(&end_time, &current_time);
-						if (0 > time_left.at_sec)
+						if (0 > time_left.tv_sec)
 						{
 							msec_timeout = -1;
 							out_of_time = TRUE;
 						} else
-							msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
-									DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
+							msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
+									DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
 						/* make sure it terminates with out_of_time */
 						if (!out_of_time && !msec_timeout)
 							msec_timeout = 1;
@@ -588,15 +593,13 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 							/* get the current time */
 							sys_get_curr_time(&current_time);
 							time_left = sub_abs_time(&end_time, &current_time);
-							if (0 > time_left.at_sec)
+							if (0 > time_left.tv_sec)
 							{
 								msec_timeout = -1;
 								out_of_time = TRUE;
 							} else
-								msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
-										      DIVIDE_ROUND_UP(time_left.at_usec,
-												      MICROSECS_IN_MSEC));
-
+								msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC
+									+ DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
 							/* make sure it terminates with out_of_time */
 							if (!out_of_time && !msec_timeout)
 								msec_timeout = 1;
@@ -723,13 +726,13 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						/* get the current time */
 						sys_get_curr_time(&current_time);
 						time_left = sub_abs_time(&end_time, &current_time);
-						if (0 > time_left.at_sec)
+						if (0 > time_left.tv_sec)
 						{
 							msec_timeout = -1;
 							out_of_time = TRUE;
 						} else
-							msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
-									DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
+							msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
+									DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
 						/* make sure it terminates with out_of_time */
 						if (!out_of_time && !msec_timeout)
 							msec_timeout = 1;
@@ -789,15 +792,14 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 								/* get the current time */
 								sys_get_curr_time(&current_time);
 								time_left = sub_abs_time(&end_time, &current_time);
-								if (0 > time_left.at_sec)
+								if (0 > time_left.tv_sec)
 								{
 									msec_timeout = -1;
 									out_of_time = TRUE;
 								} else
-									msec_timeout = (int4)(time_left.at_sec *
-											MILLISECS_IN_SEC +
-											DIVIDE_ROUND_UP(time_left.at_usec,
-											MICROSECS_IN_MSEC));
+									msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC
+										+ DIVIDE_ROUND_UP(time_left.tv_nsec,
+													NANOSECS_IN_MSEC));
 								/* make sure it terminates with out_of_time */
 								if (!out_of_time && !msec_timeout)
 									msec_timeout = 1;
@@ -1171,13 +1173,13 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						/* get the current time */
 						sys_get_curr_time(&current_time);
 						time_left = sub_abs_time(&end_time, &current_time);
-						if (0 > time_left.at_sec)
+						if (0 > time_left.tv_sec)
 						{
 							msec_timeout = -1;
 							out_of_time = TRUE;
 						} else
-							msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
-									DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
+							msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
+									DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
 						/* make sure it terminates with out_of_time */
 						if (!out_of_time && !msec_timeout)
 							msec_timeout = 1;
@@ -1308,15 +1310,15 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 									/* get the current time */
 									sys_get_curr_time(&current_time);
 									time_left = sub_abs_time(&end_time, &current_time);
-									if (0 > time_left.at_sec)
+									if (0 > time_left.tv_sec)
 									{
 										msec_timeout = -1;
 										out_of_time = TRUE;
 									} else
-										msec_timeout = (int4)(time_left.at_sec *
-												MILLISECS_IN_SEC +
-												DIVIDE_ROUND_UP(time_left.at_usec,
-												MICROSECS_IN_MSEC));
+										msec_timeout = (int4)(time_left.tv_sec *
+														MILLISECS_IN_SEC
+											+ DIVIDE_ROUND_UP(time_left.tv_nsec,
+														NANOSECS_IN_MSEC));
 									/* make sure it terminates with out_of_time */
 									if (!out_of_time && !msec_timeout)
 										msec_timeout = 1;

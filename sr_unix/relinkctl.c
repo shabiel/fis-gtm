@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,7 +29,6 @@
 #include "add_inter.h"
 #include "interlock.h"
 #include "gtmio.h"
-#include <rtnhdr.h>
 #include "relinkctl.h"
 #include "mmrhash.h"
 #include "iosp.h"
@@ -686,10 +685,14 @@ STATICFNDEF void relinkctl_map(open_relinkctl_sgm *linkctl)
 STATICFNDEF void relinkctl_unmap(open_relinkctl_sgm *linkctl)
 {
 	sm_uc_ptr_t	addr;
-	int		rc;
+	int		rc, status;
 
 	if (linkctl->locked)
-		pthread_mutex_unlock(&linkctl->hdr->exclu);
+	{
+		status = pthread_mutex_unlock(&linkctl->hdr->exclu);
+		if (0 != status)
+			ISSUE_RELINKCTLERR_TEXT(&linkctl->zro_entry_name, "relinkctl_unmap() unlock attempt failed", status);
+	}
 	addr = (sm_uc_ptr_t)linkctl->hdr;
 	munmap(addr, RELINKCTL_MMAP_SZ); /* If munmap errors, it seems better to move on than stop for a non-critical error */
 	linkctl->hdr = NULL;
@@ -791,7 +794,7 @@ void relinkctl_unlock_exclu(open_relinkctl_sgm *linkctl)
 		return;
 	status = pthread_mutex_unlock(&linkctl->hdr->exclu);
 	if (0 != status)
-		ISSUE_RELINKCTLERR_TEXT(&linkctl->zro_entry_name, "unlock attempt failed", status);
+		ISSUE_RELINKCTLERR_TEXT(&linkctl->zro_entry_name, "relinkctl_unlock_exclu() unlock attempt failed", status);
 	linkctl->locked = FALSE;
 #	endif
 	return;
@@ -933,7 +936,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 		 */
 		for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
 		{
-			SKIP_BASE_FRAMES(fp);		/* Updates rp */
+			SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 			rtnhdr = CURRENT_RHEAD_ADR(fp->rvector);
 			if ((NULL != rtnhdr) && rtnhdr->rtn_relinked && rtnhdr->shared_object)
 			{

@@ -27,7 +27,7 @@
  *   ret_subsarray - Address of an array of ydb_buffer_t subscript descriptors
  *   ydb_caller_fn - Name of function that is invoking it. Used as a parameter to PARAMINVALID error if issued.
  */
-void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn)
+int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn)
 {
 	ydb_buffer_t	*outsubp, *outsubp_top;
 	mstr		*mstrp, *mstrp_top;
@@ -36,15 +36,13 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 
 	SETUP_THREADGBL_ACCESS;
 	if (0 == TREF(sapi_query_node_subs_cnt))
-	{	/* No subscripts were returned - set to YDB_NODE_END */
-		*ret_subs_used = YDB_NODE_END;
-		return;
-	}
+		return YDB_ERR_NODEEND;	/* No subscripts were returned - return YDB_ERR_NODEEND */
 	if (-1 == TREF(sapi_query_node_subs_cnt))
-	{	/* No subscripts were returned but we are legitimately returning the basevar name in a rever $query()
-		 * so no YDB_NODE_END return code.
+	{	/* No subscripts were returned but we are legitimately returning the basevar name in a reverse $query()
+		 * so no YDB_ERR_NODEEND return code.
 		 */
 		*ret_subs_used = 0;			/* Just return 0 subscripts */
+		return YDB_OK;
 	}
 	if (NULL == ret_subsarray)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
@@ -73,11 +71,19 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 		if (mstrp->len > outsubp->len_alloc)
 			/* Buffer is too small - report an error */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, mstrp->len, outsubp->len_alloc);
-		memcpy(outsubp->buf_addr, mstrp->addr, mstrp->len);
+		if (mstrp->len)
+		{
+			if (NULL == outsubp->buf_addr)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6)
+					ERR_PARAMINVALID, 4,
+						LEN_AND_LIT("NULL ret_subsarray->buf_addr"), LEN_AND_STR(ydb_caller_fn));
+			memcpy(outsubp->buf_addr, mstrp->addr, mstrp->len);
+		}
 		/* Now that everything is in place, bump the count of subscripts. This is left till now because
 		 * when an error occurs this value is used as an INDEX to the broken subscript so we can only
 		 * increment it after the rebuffering is complete.
 		 */
 		(*ret_subs_used)++;
 	}
+	return YDB_OK;
 }

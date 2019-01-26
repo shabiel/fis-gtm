@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,7 +21,6 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "trigger.h"
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */
@@ -82,7 +84,9 @@ CONDITION_HANDLER(trigger_fill_xecute_buffer_ch)
 int trigger_fill_xecute_buffer(gv_trigger_t *trigdsc)
 {
 	int	src_fetch_status;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
 	/* We have 3 cases to consider - all of which REQUIRE a TP fence to already be in effect. The reason for this is, if we
 	 * detect a restartable condition, we are going to cause this region's triggers to be unloaded which destroys the block

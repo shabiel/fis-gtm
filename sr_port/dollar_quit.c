@@ -19,7 +19,6 @@
 
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
 #include "get_ret_targ.h"
@@ -35,6 +34,8 @@
 #  include "ia64.h"
 #elif defined(__armv6l__) || defined(__armv7l__)
 #  include "arm.h"
+#elif defined(__aarch64__)
+#  include "aarch64.h"
 #endif
 
 GBLREF	int	process_exiting;
@@ -267,6 +268,30 @@ int dollar_quit(void)
 			}
 		}
 		if (0xE597 != *(ptrs.instr_type + 1))
+		{
+			xfer_index = -1;
+		}
+	}
+#	elif defined(__aarch64__)
+	{
+#		define	MAX_SKIP	10
+		int4	skip;
+
+		/* There can be between 1 and 5 instructions to skip past */
+		for (ptrs.instr = sf->mpc,skip = 0; skip < MAX_SKIP; ptrs.instr += 4,skip++)
+		{
+			/* Check for opcode of 0xf94 (ldr) with offset off of register x23 (xfer table register)
+			*	That is -- looking for "ldr  xxx, [x23, #xfer_index]" */
+			if ((0xF94 == ((*(ptrs.xfer_offset_32) >> AARCH64_SHIFT_OP_20) & AARCH64_MASK_OP_10)) &&
+				(23 == ((*(ptrs.xfer_offset_32) >> AARCH64_SHIFT_RN) & AARCH64_MASK_REG)))
+			{
+				/* ldr offset from xfer table (offset in instruction is already divided by 8) */
+				xfer_index = ((*ptrs.xfer_offset_32) >> AARCH64_SHIFT_IMM12) & AARCH64_MASK_IMM12;
+				break;
+			}
+		}
+		if ((0xF94 != ((*(ptrs.xfer_offset_32) >> AARCH64_SHIFT_OP_20) & AARCH64_MASK_OP_10)) ||
+			(23 != ((*(ptrs.xfer_offset_32) >> AARCH64_SHIFT_RN) & AARCH64_MASK_REG)))
 		{
 			xfer_index = -1;
 		}

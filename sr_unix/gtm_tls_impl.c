@@ -20,7 +20,6 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <string.h>
-#include <assert.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <sys/types.h>
@@ -40,6 +39,10 @@
 #include "gtm_tls_impl.h"
 #include "ydb_getenv.h"
 
+#ifdef DEBUG
+#include <assert.h>	/* Use "assert" macro to check assertions in DEBUG builds */
+#endif
+
 GBLDEF	int			tls_errno;
 GBLDEF	gtmtls_passwd_list_t	*gtmtls_passwd_listhead;
 
@@ -48,14 +51,17 @@ STATICDEF DH			*dh512, *dh1024;	/* Diffie-Hellman structures for Ephemeral Diffi
 
 #define MAX_CONFIG_LOOKUP_PATHLEN	64
 
-/* Older, but still commonly used, OpenSSL versions don't have macros for TLSv1.1 and TLSv1.2 versions.
- * They are hard coded to 0x0302 and 0x0303 respectively. So, define them here for use in gtm_tls_get_conn_info.
+/* Older, but still commonly used, OpenSSL versions don't have macros for TLSv1.1, TLSv1.2 and TLSv1.3 versions.
+ * They are hard coded. So, define them here for use in gtm_tls_get_conn_info.
 */
 #ifndef TLS1_1_VERSION
 #define	TLS1_1_VERSION	0x0302
 #endif
 #ifndef TLS1_2_VERSION
 #define	TLS1_2_VERSION	0x0303
+#endif
+#ifndef TLS1_3_VERSION
+#define	TLS1_3_VERSION	0x0304
 #endif
 
 /* Below template translates to: Arrange ciphers in increasing order of strength after excluding the following:
@@ -259,6 +265,13 @@ STATICFNDEF char *parse_SSL_options(struct gtm_ssl_options *opt_table, size_t op
 #define SSL_DPRINT(FP, ...)
 #endif
 
+/* In PRO builds (where DEBUG macro is not defined), define assert(x) to be no-op.
+ * In DEBUG builds, use system assert defined by <assert.h>.
+ */
+#ifndef DEBUG
+#define assert(X)
+#endif
+
 /* OpenSSL doesn't provide an easy way to convert an ASN1 time to a string format unless BIOs are used. So, use a memory BIO to
  * write the string representation of ASN1_TIME in the said buffer.
  */
@@ -309,11 +322,6 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 		case SSL_ERROR_WANT_READ:
 			return GTMTLS_WANT_READ;
 
-		case SSL_ERROR_WANT_X509_LOOKUP:
-		case SSL_ERROR_WANT_ACCEPT:
-		case SSL_ERROR_WANT_CONNECT:
-			assert(FALSE);
-
 		case SSL_ERROR_SSL:
 		case SSL_ERROR_NONE:
 			errptr = gtmcrypt_err_string;
@@ -352,6 +360,9 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 			} while (TRUE);
 			break;
 
+		case SSL_ERROR_WANT_X509_LOOKUP:
+		case SSL_ERROR_WANT_ACCEPT:
+		case SSL_ERROR_WANT_CONNECT:
 		default:
 			tls_errno = -1;
 			UPDATE_ERROR_STRING("Unknown error: %d returned by `SSL_get_error'", error_code);
@@ -653,7 +664,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		}
 		X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL);
 	}
-	SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
+	SSL_CTX_clear_mode(ctx, SSL_MODE_AUTO_RETRY);
 	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_BOTH);
 	/* Set callbacks to called whenever a SSL session is added. */
 	SSL_CTX_sess_set_new_cb(ctx, new_session_callback);
@@ -768,7 +779,7 @@ int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *
 	/* Either no entry for tlsid or need to replace with new value */
 	pwent = MALLOC(SIZEOF(passwd_entry_t));
 	pwent->envindx = YDBENVINDX_TLS_PASSWD_PREFIX;
-	strcpy(pwent->suffix, tlsid);
+	SNPRINTF(pwent->suffix, SIZEOF(pwent->suffix), "%s", tlsid);
 	pwent->env_value = MALLOC(obs_len + 1);
 	memcpy(pwent->env_value, obs_passwd, obs_len + 1);	/* include null */
 	pwent->passwd = NULL;
@@ -1167,7 +1178,11 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			if (NULL != fp)
 			{
 				evp_pkey = PEM_read_PrivateKey(fp, &evp_pkey, &passwd_callback, pwent);
-				fclose(fp);
+				/* If fclose(fp) fails, ignore it particularly because we opened the file in "r" mode only
+				 * so there is no danger of loss of updates. If evp_pkey is non-NULL, we definitely want to
+				 * proceed. If it is NULL, we will error out a few lines later. Hence the (void) below.
+				 */
+				(void)fclose(fp);
 			} else
 				evp_pkey = NULL;
 			if (NULL == evp_pkey)
@@ -1280,8 +1295,8 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			session_id_len = session_id_len / 2;		/* bytes */
 		} else
 		{
-			strcpy((char *)session_id_string, id);		/* default to tlsid */
-			session_id_len = STRLEN(id);
+			SNPRINTF((char *)session_id_string, SIZEOF(session_id_string), "%s", id);	/* default to tlsid */
+			session_id_len = STRLEN((char *)session_id_string);
 		}
 		if (0 >= SSL_set_session_id_context(ssl, (const unsigned char *)session_id_string, (unsigned int)session_id_len))
 		{
@@ -1305,11 +1320,11 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			SSL_set_tmp_dh_callback(ssl, tmp_dh_callback);
 		}
 	}
-	tlscafile = config_lookup_string(cfg, "tls.CAfile", &CAfile);
 	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.CAfile", id);
-	config_lookup_string(cfg, cfg_path, &CAfile);	/* if absent CAfile retains value */
-	if (NULL != CAfile)
+	tlscafile = config_lookup_string(cfg, cfg_path, &CAfile);	/* if absent CAfile retains value */
+	if (CONFIG_FALSE != tlscafile)
 	{
+		assert(NULL != CAfile);
 		if (!(GTMTLS_OP_CA_LOADED & tls_ctx->flags))
 		{	/* no CAfile or CApath before so do now */
 			if (!SSL_CTX_load_verify_locations(tls_ctx->ctx, CAfile, NULL))
@@ -1361,10 +1376,37 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	return socket;
 }
 
+STATICFNDEF int ydb_tls_is_supported(SSL *ssl);
+
+/* Function to check if the negotiated TLS version of the connection is a supported version.
+ * Returns  0 if supported.
+ *         -1 if not supported.
+ */
+STATICFNDEF int ydb_tls_is_supported(SSL *ssl)
+{
+	int	ssl_version;
+
+	ssl_version = SSL_version(ssl);
+	switch (ssl_version)
+	{
+		case TLS1_1_VERSION:
+		case TLS1_2_VERSION:
+		case TLS1_3_VERSION:
+			/* The above are the supported TLS versions */
+			return 0;
+			break;
+		default:
+			/* Anything else is currently unsupported */
+			UPDATE_ERROR_STRING("%s version unsupported by the TLS plug-in", SSL_get_version(ssl));
+			tls_errno = -1;
+			break;
+	}
+	return -1;
+}
+
 int gtm_tls_connect(gtm_tls_socket_t *socket)
 {
 	int		rv;
-	long		verify_result;
 
 	assert(CLIENT_MODE(socket->flags));
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
@@ -1375,43 +1417,53 @@ int gtm_tls_connect(gtm_tls_socket_t *socket)
 			return ssl_error(socket, rv, X509_V_OK);
 		SSL_DPRINT(stdout, "gtm_tls_connect(2): references=%d\n", ((SSL_SESSION *)(socket->session))->references);
 	}
-	if (0 < (rv = SSL_connect(socket->ssl)))
-	{
-		if (NULL != socket->session)
-			SSL_DPRINT(stdout, "gtm_tls_connect(3): references=%d\n", ((SSL_SESSION *)(socket->session))->references);
-		verify_result = SSL_get_verify_result(socket->ssl);
-		if (X509_V_OK == verify_result)
-			return 0;
-	} else
-		verify_result = SSL_get_verify_result(socket->ssl);
-	return ssl_error(socket, rv, verify_result);
+	if (0 >= (rv = SSL_connect(socket->ssl)))
+		return ssl_error(socket, rv, X509_V_OK);
+	if (NULL != socket->session)
+		SSL_DPRINT(stdout, "gtm_tls_connect(3): references=%d\n", ((SSL_SESSION *)(socket->session))->references);
+	return ydb_tls_is_supported(socket->ssl);
 }
 
 int gtm_tls_accept(gtm_tls_socket_t *socket)
 {
-	int		rv;
-	long		verify_result;
+	int	rv;
 
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	rv = SSL_accept(socket->ssl);
-	verify_result = SSL_get_verify_result(socket->ssl);
-	if ((0 < rv) && (X509_V_OK == verify_result))
-			return 0;
-	return ssl_error(socket, rv, verify_result);
+	if (0 >= rv)
+		return ssl_error(socket, rv, X509_V_OK);
+	return ydb_tls_is_supported(socket->ssl);
 }
 
 int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 {
-	int		rv;
+	int		rv, ssl_version;
 	long		vresult;
+	SSL		*ssl;
 
-	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
-	if (0 >= (rv = SSL_renegotiate(socket->ssl)))
-		return ssl_error(socket, rv, SSL_get_verify_result(socket->ssl));
+	ssl = socket->ssl;
+	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(ssl));
+	/* TLSv1.3 does not have renegotiation so calls to "SSL_renegotiate" will immediately fail if invoked on a
+	 * connection that has negotiated TLSv1.3. Since the purpose of "gtm_tls_renegotiate" is to update the connection
+	 * keys, use "SSL_key_update" for that purpose in TLS v1.3.
+	 */
+	ssl_version = SSL_version(ssl);
+	if (TLS1_3_VERSION > ssl_version)
+		rv = SSL_renegotiate(ssl);	/* Schedule a renegotiation */
+	/* Note: "SSL_key_update" function is available only from OpenSSL 1.1.1 onwards hence the OPENSSL_VERSION_NUMBER check
+	 * below to avoid a compile error if this plugin is compiled on a system which has an older OpenSSL version installed.
+	 * See "man OPENSSL_VERSION_NUMBER" for details on its format.
+	 */
+#	if OPENSSL_VERSION_NUMBER >= 0x1010100fL
+	else
+		rv = SSL_key_update(ssl, SSL_KEY_UPDATE_REQUESTED);
+#	endif
+	if (0 >= rv)
+		return ssl_error(socket, rv, SSL_get_verify_result(ssl));
 	do
 	{
-		rv = SSL_do_handshake(socket->ssl);
-		vresult = SSL_get_verify_result(socket->ssl);
+		rv = SSL_do_handshake(ssl);
+		vresult = SSL_get_verify_result(ssl);
 		if ((0 < rv) && (X509_V_OK == vresult))
 			return 0;
 		/* On a blocking socket, SSL_do_handshake returns ONLY after successful completion. However, if the system call
@@ -1595,8 +1647,12 @@ int gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_timeout, char
 			SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.CAfile", socket->tlsid);
 			rv = config_lookup_string(cfg, cfg_path, &CAfile);
 			if (CONFIG_FALSE == rv)
-			{
-				rv = config_lookup_string(cfg, "tls.CAfile", &CAfile);
+			{	/* We intentionally do not check the return value of the below call. If it returns CONFIG_FALSE,
+				 * we are guaranteed CAfile is NULL. In that case, we will anyways skip the later "if" block
+				 * of code that handles a non-NULL CAfile. No error is needed in that case.
+				 */
+				assert(NULL == CAfile);
+				(void)config_lookup_string(cfg, "tls.CAfile", &CAfile);
 			}
 		}
 		if (NULL != CAfile)
@@ -1613,7 +1669,7 @@ int gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_timeout, char
 		}
 		if ((0 < session_id_len)
 			&& (0 >= SSL_set_session_id_context(ssl, (const unsigned char *)session_id_string,
-						(unsigned int)session_id_len)))
+										(unsigned int)session_id_len)))
 		{
 			GC_APPEND_OPENSSL_ERROR("Failed to set Session-ID context to enable session resumption.");
 			tls_errno = -1;
@@ -1629,10 +1685,9 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 {
 	long			verify_result, timeout, creation_time;
 	int			session_id_length;
-	unsigned int		ssl_version;
 	const SSL_CIPHER	*cipher;
 	const COMP_METHOD	*compression_method;
-	char			*ssl_version_ptr, *session_id_ptr;
+	char			*session_id_ptr;
 	gtm_tls_ctx_t		*tls_ctx;
 	X509			*peer;
 	SSL			*ssl;
@@ -1648,30 +1703,7 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 		if ((X509_V_OK == verify_result) || (GTMTLS_OP_ABSENT_CONFIG & tls_ctx->flags))
 		{	/* return information for Socket clients even without a config file */
 			/* SSL-Session Protocol */
-			switch (ssl_version = SSL_version(ssl))
-			{
-				case SSL2_VERSION:
-					ssl_version_ptr = "SSLv2";
-					break;
-
-				case SSL3_VERSION:
-					ssl_version_ptr = "SSLv3";
-					break;
-
-				case TLS1_VERSION:
-					ssl_version_ptr = "TLSv1";
-					break;
-				case TLS1_1_VERSION:
-					ssl_version_ptr = "TLSv1.1";
-					break;
-				case TLS1_2_VERSION:
-					ssl_version_ptr = "TLSv1.2";
-					break;
-				default:
-					assert(FALSE && ssl_version);
-					break;
-			}
-			SNPRINTF(conn_info->protocol, SIZEOF(conn_info->protocol), "%s", ssl_version_ptr);
+			SNPRINTF(conn_info->protocol, SIZEOF(conn_info->protocol), "%s", SSL_get_version(ssl));
 			/* SSL-Session Cipher Algorithm */
 			cipher = SSL_get_current_cipher(ssl);
 			SNPRINTF(conn_info->session_algo, SIZEOF(conn_info->session_algo), "%s", SSL_CIPHER_get_name(cipher));
@@ -1771,35 +1803,23 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 int gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len)
 {
 	int		rv;
-	long		verify_result;
 
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
-	if (0 < (rv = SSL_write(socket->ssl, buf, send_len)))
-	{
-		assert(SSL_ERROR_NONE == SSL_get_error(socket->ssl, rv));
-		verify_result = SSL_get_verify_result(socket->ssl);
-		if (X509_V_OK == verify_result)
-			return rv;
-	} else
-		verify_result = SSL_get_verify_result(socket->ssl);
-	return ssl_error(socket, rv, verify_result);
+	rv = SSL_write(socket->ssl, buf, send_len);
+	if (0 >= rv)
+		return ssl_error(socket, rv, X509_V_OK);
+	return rv;
 }
 
 int gtm_tls_recv(gtm_tls_socket_t * socket, char *buf, int recv_len)
 {
 	int		rv;
-	long		verify_result;
 
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
-	if (0 < (rv = SSL_read(socket->ssl, buf, recv_len)))
-	{
-		assert(SSL_ERROR_NONE == SSL_get_error(socket->ssl, rv));
-		verify_result = SSL_get_verify_result(socket->ssl);
-		if (X509_V_OK == verify_result)
-			return rv;
-	} else
-		verify_result = SSL_get_verify_result(socket->ssl);
-	return ssl_error(socket, rv, verify_result);
+	rv = SSL_read(socket->ssl, buf, recv_len);
+	if (0 >= rv)
+		return ssl_error(socket, rv, X509_V_OK);
+	return rv;
 }
 
 int gtm_tls_cachedbytes(gtm_tls_socket_t *socket)

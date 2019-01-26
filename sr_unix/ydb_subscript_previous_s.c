@@ -33,7 +33,7 @@
 
 GBLREF	volatile int4	outofband;
 
-LITREF	mval	literal_zero;
+LITREF	mval	literal_null;
 
 /* Routine to locate the previous subscript at a given level.
  *
@@ -52,7 +52,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 	boolean_t	error_encountered;
 	gparam_list	plist;
 	ht_ent_mname	*tabent;
-	int		get_svn_index;
+	int		get_svn_index, status;
 	lv_val		*lvvalp, *ord_lv;
 	mname_entry	var_mname;
 	mval		*subval, previoussub, *previoussub_mv, varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
@@ -61,17 +61,17 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_SUBSCRIPT_PREVIOUS);	/* Note: macro could "return" from this function in case of errors */
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
-							 * corresponding ydb_*_s() call.
-							 */
+	LIBYOTTADB_INIT(LYDB_RTN_SUBSCRIPT_PREVIOUS, (int));	/* Note: macro could "return" from this function in case of errors */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));		/* previously unused entries should have been cleared by that
+								 * corresponding ydb_*_s() call.
+								 */
+	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have never become non-zero and even if it did,
 								 * it should have been cleared by "ydb_simpleapi_ch".
 								 */
-		LIBYOTTADB_DONE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -86,7 +86,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-					LEN_AND_LIT("NULL ret_value"), LEN_AND_LIT("ydb_subscript_previous_s()"));
+			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_PREVIOUS)));
 		/* Separate actions depending on type of variable for which the previous subscript is being located */
 	switch(get_type)
 	{
@@ -113,14 +113,14 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 				if (NULL == lvvalp)
 				{	/* Base local variable does not exist (ERR_LVUNDEF_OK_FALSE above is to ensure
 					 * we do not issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
-					 * Return 0 for "ydb_subscript_previous_s" result.
+					 * Return null-string (i.e. no more subscripts) for "ydb_subscript_previous_s" result.
 					 */
-					SET_YDB_BUFF_T_FROM_MVAL(ret_value, (mval *)&literal_zero,
-									"NULL ret_value->buf_addr", "ydb_subscript_previous_s()");
+					SET_YDB_BUFF_T_FROM_MVAL(ret_value, (mval *)&literal_null,
+						"NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_PREVIOUS));
 					break;
 				}
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals,		\
-								FALSE, 1, "ydb_subscript_previous_s()");
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals,
+					FALSE, 1, LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_PREVIOUS));
 				plist.n--;				/* Don't use last subscr in lookup */
 				if (1 < subs_used)
 				{	/* Drive op_srchindx() to find node at level prior to target level */
@@ -137,7 +137,6 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 				previoussub_mv = &previoussub;
 				MV_FORCE_STR(previoussub_mv);
 			}
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub, "NULL ret_value->buf_addr", "ydb_subscript_previous_s()");
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-previous processing is the same regardless of argument count:
@@ -154,13 +153,12 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals,		\
-								FALSE, 1, "ydb_subscript_previous_s()");
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals,
+					FALSE, 1, LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_PREVIOUS));
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to create key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get previous global */
 			op_zprevious(&previoussub);			/* Locate previous subscript this level */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub, "NULL ret_value->buf_addr", "ydb_subscript_previous_s()");
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
@@ -168,9 +166,18 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 			break;
 		default:
 			assertpro(FALSE);
+			break;
 	}
+	assert(MVTYPE_IS_STRING(previoussub.mvtype));
+	if (previoussub.str.len)
+	{
+		SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub, "NULL ret_value->buf_addr",
+								LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_PREVIOUS));
+		status = YDB_OK;
+	} else
+		status = YDB_ERR_NODEEND; /* About to return the empty string. Signal end of list. Leave "ret_value" untouched */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;
-	return YDB_OK;
+	return status;
 }

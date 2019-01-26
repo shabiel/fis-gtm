@@ -35,7 +35,6 @@
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
 #include "repl_msg.h"
 #include "gtmsource.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "wbox_test_init.h"
 
@@ -77,7 +76,9 @@ boolean_t gvcst_get(mval *v)
 	sm_uc_ptr_t	sn_ptr;
 	int		debug_len;
 	int		save_dollar_tlevel;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	gotit = gvcst_get2(v, NULL);
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) 1);

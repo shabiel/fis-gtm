@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,13 +39,16 @@
 #include "send_msg.h"
 #include "generic_signal_handler.h"
 #include "gtmmsg.h"
+#include "io.h"
 #include "gtmio.h"
 #include "have_crit.h"
 #include "util.h"
+#include "libyottadb_int.h"
+#include "invocation_mode.h"
 
-#define	DEFER_EXIT_PROCESSING	((EXIT_PENDING_TOLERANT >= exit_state)				\
-					&& (exit_handler_active || multi_thread_in_use		\
-						|| multi_proc_in_use || !OK_TO_INTERRUPT))
+#define	DEFER_EXIT_PROCESSING	((EXIT_PENDING_TOLERANT >= exit_state)			\
+				 && (exit_handler_active || multi_thread_in_use		\
+				     || multi_proc_in_use || !OK_TO_INTERRUPT))
 
 /* Combine send_msg and gtm_putmsg into one macro to conserve space. */
 #define SEND_AND_PUT_MSG(...)					\
@@ -54,13 +57,6 @@
 		send_msg_csa(CSA_ARG(NULL) __VA_ARGS__);	\
 	gtm_putmsg_csa(CSA_ARG(NULL) __VA_ARGS__);		\
 }
-
-/* These fields are defined as globals not because they are used globally but
- * so they will be easily retrievable even in 'pro' cores.
- */
-GBLDEF siginfo_t		exi_siginfo;
-
-GBLDEF gtm_sigcontext_t 	exi_context;
 
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			exi_condition;
@@ -78,6 +74,7 @@ GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF	volatile boolean_t	timer_active;
 GBLREF	sigset_t		block_sigsent;
 GBLREF	boolean_t		blocksig_initialized;
+GBLREF	struct sigaction	orig_sig_action[];
 #ifdef DEBUG
 GBLREF	boolean_t		in_nondeferrable_signal_handler;
 #endif
@@ -95,6 +92,7 @@ error_def(ERR_KRNLKILL);
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
+	boolean_t		lcl_exi_signal_forwarded;
 	gtm_sigcontext_t	*context_ptr;
 	void			(*signal_routine)();
 #	ifdef DEBUG
@@ -109,7 +107,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	 */
 	if (thread_block_sigsent && sigismember(&block_sigsent, sig))
 		return;
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig);
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig, IS_EXI_SIGNAL_TRUE, info, context);
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into timer_handler
 	 * and then came here due to a nested signal (e.g. SIG-15). So save current value of global and restore it at
@@ -121,20 +119,25 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	dont_want_core = FALSE;		/* (re)set in case we recurse */
 	created_core = FALSE;		/* we can deal with a second core if needbe */
 	exi_condition = sig;
-	if (NULL != info)
-		exi_siginfo = *info;
-	else
-		memset(&exi_siginfo, 0, SIZEOF(*info));
-#	if defined(__ia64) && defined(__hpux)
-	context_ptr = (gtm_sigcontext_t *)context;	/* no way to make a copy of the context */
-	memset(&exi_context, 0, SIZEOF(exi_context));
-#	else
-	if (NULL != context)
-		exi_context = *(gtm_sigcontext_t *)context;
-	else
-		memset(&exi_context, 0, SIZEOF(exi_context));
+	if (exi_signal_forwarded && (sig != exi_signal_forwarded))
+	{	/* We had forwarded the signal "exi_signal_forwarded" in a previous call to "generic_signal_handler" but
+		 * this call is for a different signal. Forget whatever was recorded in previous forwarding and treat
+		 * this as a fresh signal occurrence (which will be recorded in case it gets forward) by clearing
+		 * evidence of exi_signal forwarding.
+		 */
+		exi_signal_forwarded = 0;
+	}
+	if (sig != exi_signal_forwarded)
+	{	/* Signal has not been forwarded. Note down passed in "info" and "context" into global variables */
+		SET_EXI_SIGINFO_AS_APPROPRIATE(info);
+		SET_EXI_CONTEXT_AS_APPROPRIATE(context);
+	}
+	/* else: Signal has been forwarded. "exi_siginfo" and "exi_context" already point to pre-forwarded "info" and "context"
+	 *	(see FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macro for details).
+	 */
+	lcl_exi_signal_forwarded = exi_signal_forwarded;	/* Note down global variable in local before clearing global */
+	exi_signal_forwarded = 0;	/* Now that "exi_siginfo" and "exi_context" are set appropriately, clear this global */
 	context_ptr = &exi_context;
-#	endif
 	/* Check if we are fielding nested immediate shutdown signals */
 	if (EXIT_IMMED <= exit_state)
 	{
@@ -145,7 +148,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			case SIGSEGV:
 			case SIGBUS:
 			case SIGILL:
-				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 				if (core_in_progress)
 				{
 					if (exit_handler_active)
@@ -179,7 +182,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 						SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
 					return;
 				}
-				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 				exit_state = EXIT_IMMED;
 				SET_PROCESS_EXITING_TRUE; 	/* Set this BEFORE cancelling timers as wcs_phase2_commit_wait
 								 * relies on this.
@@ -188,15 +191,15 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
 			} else
 			{	/* Special case for gtmsecshr - no deferral just exit */
-				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 				forced_exit_err = ERR_GTMSECSHRSHUTDN;
 				if (OK_TO_SEND_MSG)
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
 			}
-			dont_want_core = TRUE;
+			dont_want_core = TRUE; assert(IS_DONT_WANT_CORE_TRUE(sig));
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */
-			dont_want_core = TRUE;
+			dont_want_core = TRUE; assert(IS_DONT_WANT_CORE_TRUE(sig));
 			extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
 			switch(signal_info.infotype)
 			{
@@ -227,61 +230,43 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				assert(!IS_GTMSECSHR_IMAGE);
 				return;
 			}
-			DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+			DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 			exit_state = EXIT_IMMED;
 			SET_PROCESS_EXITING_TRUE;
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:
 					SEND_AND_PUT_MSG(VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type),
-						process_id, sig);
+							 process_id, sig);
 					break;
 				case GTMSIGINFO_USER:
 					SEND_AND_PUT_MSG(VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
-						process_id, sig, signal_info.send_pid, signal_info.send_uid);
+							 process_id, sig, signal_info.send_pid, signal_info.send_uid);
 					break;
 				case GTMSIGINFO_ILOC + GTMSIGINFO_BADR:
 					SEND_AND_PUT_MSG(VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
-						process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
+							 process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
 					break;
 				case GTMSIGINFO_ILOC:
 					SEND_AND_PUT_MSG(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
-						process_id, sig, signal_info.int_iadr);
+							 process_id, sig, signal_info.int_iadr);
 					break;
 				case GTMSIGINFO_BADR:
 					SEND_AND_PUT_MSG(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
-						process_id, sig, signal_info.bad_vadr);
+							 process_id, sig, signal_info.bad_vadr);
 					break;
 			}
 			break;
-#		ifdef _AIX
-		case SIGDANGER:
-			forced_exit_err = ERR_KRNLKILL;
-			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if (DEFER_EXIT_PROCESSING)
-			{
-				SET_FORCED_EXIT_STATE;
-				exit_state++;		/* Make exit pending, may still be tolerant though */
-				assert(!IS_GTMSECSHR_IMAGE);
-				return;
-			}
-			DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
-			exit_state = EXIT_IMMED;
-			SET_PROCESS_EXITING_TRUE;
-			SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
-			dont_want_core = TRUE;
-			break;
-#		endif
 		default:
 			extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:
-					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
 					SEND_AND_PUT_MSG(VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type),
-						process_id, sig);
+							 process_id, sig);
 					break;
 				case GTMSIGINFO_USER:
 					/* This signal was SENT to us so it can wait until we are out of crit to cause an exit */
@@ -293,17 +278,17 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 						SET_FORCED_EXIT_STATE;
 						exit_state++;		/* Make exit pending, may still be tolerant though */
 						need_core = TRUE;
-						gtm_fork_n_core();	/* Generate "virgin" core while we can */
+						MULTI_THREAD_AWARE_FORK_N_CORE(lcl_exi_signal_forwarded);
 						return;
 					}
-					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
 					SEND_AND_PUT_MSG(VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
-						process_id, sig, signal_info.send_pid, signal_info.send_uid);
+							 process_id, sig, signal_info.send_pid, signal_info.send_uid);
 					break;
 				case GTMSIGINFO_ILOC + GTMSIGINFO_BADR:
-					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
 					/* SIGABRT is usually delivered when memory corruption is detected by glibc
@@ -312,24 +297,24 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					 */
 					assert(SIGABRT != sig);
 					SEND_AND_PUT_MSG(VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
-						process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
+							 process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
 					break;
 				case GTMSIGINFO_ILOC:
-					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
 					SEND_AND_PUT_MSG(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
-						process_id, sig, signal_info.int_iadr);
+							 process_id, sig, signal_info.int_iadr);
 					break;
 				case GTMSIGINFO_BADR:
-					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
 					SEND_AND_PUT_MSG(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
-						process_id, sig, signal_info.bad_vadr);
+							 process_id, sig, signal_info.bad_vadr);
 					break;
 				default:
-					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
 					assertpro(FALSE && signal_info.infotype);;	/* show signal_info if there's a failure */
@@ -347,10 +332,13 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	if (timer_active)
 		sys_canc_timer();
 	FFLUSH(stdout);
+	/* Generate core (if we want one). We want to do this before we go through the rest of handling this signal which would
+	 * potentially modify information we want to see in the core.
+	 */
 	if (!dont_want_core)
 	{
 		need_core = TRUE;
-		gtm_fork_n_core();
+		MULTI_THREAD_AWARE_FORK_N_CORE(lcl_exi_signal_forwarded);
 	}
 	/* If any special routines are registered to be driven on a signal, drive them now */
 	if (0 != exi_condition)
@@ -377,13 +365,15 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			(*signal_routine)();
 		}
 	}
-	if (!IS_GTMSECSHR_IMAGE)
+	if (IS_GTMSECSHR_IMAGE)
 	{
-		assert((EXIT_IMMED <= exit_state) || !exit_handler_active);
-		EXIT(-exi_condition);
+		DEBUG_ONLY(in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler);
+		return;
 	} else
 	{
-		DEBUG_ONLY(in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler;)
-		return;
+		/* If this is call-in/simpleAPI mode and a handler exists for this signal, call it */
+		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
 	}
+	assert((EXIT_IMMED <= exit_state) || !exit_handler_active);
+	EXIT(-exi_condition);
 }

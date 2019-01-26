@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,7 +45,6 @@
 #include "send_msg.h"
 #include "svnames.h"		/* for SV_ZTWORMHOLE */
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "gdskill.h"
 #include "tp.h"
@@ -429,7 +431,8 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			MUR_SET_JNL_FENCE_CTL_TOKEN(rec->jrec_null.jnl_seqno, rctl);
 			jnl_fence_ctl.strm_seqno = rec->jrec_null.strm_seqno;
 		}
-		gvcst_jrt_null();
+		assert(0 == rec->jrec_null.bitmask.filler);
+		gvcst_jrt_null(rec->jrec_null.bitmask.salvaged);	/* Preserve "salvaged" bit during replay of JRT_NULL */
 		break;
 	default:
 		assert(FALSE);

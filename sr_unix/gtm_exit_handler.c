@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -46,6 +49,8 @@
 #include "relinkctl.h"
 #include "gvcst_protos.h"
 #include "op.h"
+#include "trace_table.h"
+#include "libyottadb_int.h"
 
 GBLREF	int4			exi_condition;
 GBLREF	uint4			dollar_tlevel;
@@ -57,10 +62,16 @@ GBLREF	boolean_t		exit_handler_active;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF 	boolean_t		is_tracing_on;
+GBLREF	int			fork_after_ydb_init;
+GBLREF	stm_workq		*stmWorkQueue[];
+GBLREF	boolean_t		forced_simplethreadapi_exit;
 #ifdef DEBUG
 GBLREF 	boolean_t		stringpool_unusable;
 GBLREF 	boolean_t		stringpool_unexpandable;
+GBLREF	int			process_exiting;
 #endif
+
+LITREF	mval		literal_notimeout;
 
 enum rundown_state
 {
@@ -73,12 +84,6 @@ enum rundown_state
 };
 
 static	enum rundown_state	attempting;
-
-#ifdef DEBUG
-GBLREF	int			process_exiting;
-#endif
-
-LITREF	mval		literal_notimeout;
 
 /* This macro is a framework to help perform ONE type of rundown (e.g. db or lock or io rundown etc.).
  * "gtm_exit_handler" invokes this macro for each type of rundown that is needed and passes appropriate
@@ -125,7 +130,7 @@ LITREF	mval		literal_notimeout;
 	secshr_db_clnup(NORMAL_TERMINATION);								\
 	zcall_halt();											\
 	op_unlock();											\
-	op_zdeallocate((mval *)&literal_notimeout);									\
+	op_zdeallocate((mval *)&literal_notimeout);							\
 }
 
 #define	IO_RUNDOWN_MACRO											\
@@ -170,20 +175,64 @@ void gtm_exit_handler(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (fork_after_ydb_init)
+	{	/* This process had SimpleAPI or SimpleThreadAPI active when a "fork" happened to create this child process.
+		 * The YottaDB engine has not been initialized in the child process yet (or else "fork_after_ydb_init" would
+		 * have been cleared) so skip any YottaDB cleanup as part of exit handling.
+		 */
+		return;
+	}
 	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
+	if (simpleThreadAPI_active)
+	{
+		if (!IS_STAPI_WORKER_THREAD)
+		{	/* This is a SimpleThreadAPI environment and the thread that is invoking the exit handler is not the
+			 * MAIN worker thread. This is an out-of-design situation since this would imply concurrently running
+			 * the YottaDB engine in this thread and the MAIN worker thread. Therefore signal the MAIN worker thread
+			 * to run the exit handler stuff, wait for that to finish (it would have run "gtm_exit_handler") and then
+			 * return. All this is already done by "ydb_exit" so invoke it and return.
+			 */
+			 ydb_exit();
+			 return;
+		} else
+		{	/* We are the MAIN worker thread.
+			 *
+			 * If this invocation of "gtm_exit_handler" is coming through "generic_signal_handler" or "ydb_stm_thread"
+			 * then they would have deferred the invocation until we reach a logical point
+			 * (i.e. "forced_simplethreadapi_exit" is TRUE). In this case though, we can safely continue with exit
+			 * processing in this invocation.
+			 *
+			 * But it is possible the exit handler is invoked through other means in the MAIN worker
+			 * thread (e.g. EXIT macro usage in "wait_for_repl_inst_unfreeze_nocsa_jpl" OR a fatal YDB-F-MEMORY
+			 * error happens in the MAIN worker thread with the following C-stack call graph
+			 *	gtm_malloc -> raise_gtmmemory_error -> rts_error_csa -> rts_error_va -> ydb_simpleapi_ch
+			 *		-> stop_image_no_core -> gtm_image_exit -> exit).
+			 * In this case though "forced_simplethreadapi_exit" would not be set. And it is not safe to continue
+			 * with exit processing in this invocation of "gtm_exit_handler". It is better to wait for some time for
+			 * the TP worker threads (if any) to terminate before continuing with exit handling. "ydb_stm_thread_exit"
+			 * takes care of that so invoke that in this case.
+			 */
+			if (!forced_simplethreadapi_exit)
+			{
+				ydb_stm_thread_exit();
+				return;
+			}
+		}
+	}
 	exit_handler_active = TRUE;
+	ydb_dmp_tracetbl();
 	attempting = rundown_state_lock;
 	actual_exi_condition = 0;
 	ESTABLISH_NORET(exi_ch, error_seen);	/* "error_seen" is initialized inside this macro */
-#ifdef DEBUG
+#	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) && (NO_STATS_OPTIN != TREF(statshare_opted_in)))
 	{	/* Forced to FALSE when killing processes and we may need to rundown statsdbs */
 		stringpool_unusable = FALSE;
 		stringpool_unexpandable = FALSE;
 		fast_lock_count = 0;
 	}
-#endif
+#	endif
 	RUNDOWN_STEP(rundown_state_lock, rundown_state_mprof, ERR_LKRUNDOWN, LOCK_RUNDOWN_MACRO);
 	RUNDOWN_STEP(rundown_state_mprof, rundown_state_statsdb, ERR_MPROFRUNDOWN, MPROF_RUNDOWN_MACRO);
 	/* The condition handler used in the gvcst_remove_statsDB_linkage_all() path takes care of sending errors */

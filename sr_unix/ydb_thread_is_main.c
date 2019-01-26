@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,9 +15,12 @@
 #include "gtmxc_types.h"
 #include "error.h"
 #include "send_msg.h"
+#include "libyottadb_int.h"
 #include "libydberrors.h"
 
-/* Simple YottaDB wrapper for gtm_is_main_thread() */
+/* Simple YottaDB wrapper for gtm_is_main_thread(). The gtm_is_main_thread routine generates no errors so no
+ * further checking or framework as in other utilities is warranted.
+ */
 int ydb_thread_is_main(void)
 {
 	int		status;
@@ -26,17 +29,7 @@ int ydb_thread_is_main(void)
 
 	SETUP_THREADGBL_ACCESS;
 	if (process_exiting)
-	{	/* YDB runtime environment not setup/available, no driving of errors */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		return YDB_ERR_CALLINAFTERXIT;
-	}
-	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
-	if (error_encountered)
-	{	/* Some error occurred - return the error code to the caller ($ZSTATUS is set) */
-		REVERT;
-		return -(TREF(ydb_error_code));
-	}
+		return YDB_ERR_CALLINAFTERXIT;	/* YDB runtime environment not setup/available, no driving of errors */
 	status = gtm_is_main_thread();
-	REVERT;
 	return status ? YDB_OK : YDB_NOTOK;
 }

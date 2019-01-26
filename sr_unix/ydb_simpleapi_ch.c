@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_pthread.h"
 
 #include "error.h"
 #include "error_trap.h"
@@ -53,6 +54,8 @@
 #include "tp_restart.h"
 #include "tp_frame.h"
 #include "create_fatal_error_zshow_dmp.h"
+#include "gtm_multi_thread.h"
+#include "trace_table.h"
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	boolean_t		created_core;
@@ -73,15 +76,20 @@ GBLREF	uint4			ydbDebugLevel;		/* Debug level */
 GBLREF	mval			dollar_zstatus;
 GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible - see tp_restart.h */
 GBLREF	int4			gtm_trigger_depth;
-#ifdef DEBUG
-GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
-#endif
 GBLREF	int			mumps_status;
 GBLREF	uint4			dollar_trestart;
 GBLREF	trans_num		local_tn;
 GBLREF	uint4			simpleapi_dollar_trestart;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+GBLREF	pthread_mutex_t		thread_mutex;
+GBLREF	uint4			process_id;
+GBLREF  mval			dollar_zstatus;
+#ifdef DEBUG
+GBLREF	char			*thread_mutex_holder_rtn;
+GBLREF	int			thread_mutex_holder_line;
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
 
 /* Condition handler for simpleAPI environment. This routine catches all errors thrown by the YottaDB engine. The error
  * is basically returned to the user as the negative of the error to differentiate those errors from positive (success
@@ -98,8 +106,16 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	int			zstatus_buffer_len;
 	int			rc;
 	mstr			entryref;
+	boolean_t		was_holder;
+	ydb_buffer_t		*errstr;
 
 	START_CH(TRUE);
+	/* If thread_mutex is locked (from rts_error) by this thread, release it ignoring errors at this point */
+	if (thread_mutex_initialized)
+	{
+		was_holder = !IS_LIBPTHREAD_MUTEX_LOCK_HOLDER;
+		PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
+	}
 	if (ERR_REPEATERROR == SIGNAL)
 		arg = SIGNAL = dollar_ecode.error_last_ecode;	/* Rethrown error. Get primary error code */
 	/* The mstrs that were part of the current ydb_*_s() call and were being protected from "stp_gcol" through a global
@@ -153,13 +169,29 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 		 */
 		assert(active_ch[1].dollar_tlevel >= dollar_tlevel);
 		DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;)
+		TREF(sapi_mstrs_for_gc_indx) = 0;
+		TREF(sapi_query_node_subs_cnt) = 0;
+		LIBYOTTADB_DONE;
 		UNWIND(NULL, NULL);
 	}
 	if (ERR_REPEATERROR != SIGNAL)
 	{
-		entryref.addr = SIMPLEAPI_M_ENTRYREF;
-		entryref.len = STR_LIT_LEN(SIMPLEAPI_M_ENTRYREF);
+		SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);
 		set_zstatus(&entryref, arg, NULL, FALSE);
+		errstr = TREF(stapi_errstr);
+		if (NULL != errstr)
+		{	/* We are inside a SimpleThreadAPI call and user wants us to fill error string in addition to returning
+			 * an integer error code. Do that right here after $zstatus has been filled in.
+			 */
+			assert(simpleThreadAPI_active);
+			ydb_zstatus(errstr->buf_addr, errstr->len_alloc);
+			/* errstr->buf_addr points to a null-terminated string. So no need for errstr->len_used.
+			 * Therefore set it to the actual length of the error string.
+			 * If errstr->len_used > errstr->len_alloc - 1, then user knows they got a truncated error string
+			 * and need to pass in a bigger buffer to avoid truncation in future SimpleThreadAPI calls.
+			 */
+			errstr->len_used = dollar_zstatus.str.len;
+		}
 	}
 	/* Ensure gv_target and cs_addrs are in sync. If not, make them so. */
 	if (NULL != gv_target)

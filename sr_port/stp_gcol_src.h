@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -42,7 +42,6 @@
 #include "lv_val.h"
 #include "subscript.h"
 #include "mdq.h"
-#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "stp_parms.h"
@@ -367,6 +366,9 @@ MBSTART {														\
 #endif
 static void expand_stp(size_t new_size)	/* BYPASSOK */
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	if (retry_if_expansion_fails)
 		ESTABLISH(stp_gcol_ch);
 	assert(IS_GTM_IMAGE || IS_MUPIP_IMAGE);
@@ -850,7 +852,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 				 *	base frame described above, that also has a type of SFT_COUNT should stop rearward
 				 *	stack travel and break the loop.
 				 */
-				SKIP_BASE_FRAMES(sf);		/* Updates sf */
+				SKIP_BASE_FRAMES(sf, (SFT_CI | SFT_TRIGR)); /* Can update sf if sf is call-in/trigger base frame */
 				if (NULL == sf)
 					break;
 				assert(sf->temps_ptr);

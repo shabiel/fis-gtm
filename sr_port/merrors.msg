@@ -393,7 +393,7 @@ ZPRTLABNOTFND	<Label not found in routine>/error/fao=0!/ansi=13
 VIEWAMBIG	<View parameter !AD is ambiguous>/error/fao=2!/ansi=0
 VIEWNOTFOUND	<View parameter !AD not valid>/error/fao=2!/ansi=0
 UNUSEDMSG395	<ZSETPRVARGBAD nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
-INVSPECREC	<Invalid global modifier record>/error/fao=0!/ansi=0
+INVSPECREC	<!AD Invalid global modifier record>/error/fao=2!/ansi=0
 UNUSEDMSG397	<ZSETPRVSYNTAX nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 ZSRCHSTRMCT	<Search stream identifier out of range>/error/fao=0!/ansi=0
 VERSION		<Version mismatch - This program must be recompiled>/error/fao=0!/ansi=0
@@ -830,7 +830,7 @@ NEWJNLFILECREAT	<Journal file !AD nearing maximum size.  New journal file create
 DSKSPACEFLOW	<Disk Space for file !AD nearing maximum size.  !UL blocks available.>/info/fao=3!/ansi=0
 GVINCRFAIL	<Global variable $INCR failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 ISOLATIONSTSCHN	<Error changing NOISOLATION status for global ^!AD within a TP transaction from !UL to !UL>/error/fao=4!/ansi=0
-REPLGBL2LONG	<Global names longer than 8 characters cannot be handled at the secondary>/error/fao=0!/ansi=0
+UNUSEDMSG833	<REPLGBL2LONG nixed in r1.24>/error/fao=0!/ansi=0
 TRACEON		<Missing global name (with optional subscripts) for recording M-tracing information>/error/fao=0!/ansi=0
 TOOMANYCLIENTS	<GT.CM is serving the maximum number of clients.  Try again later.>/error/fao=0!/ansi=0
 NOEXCLUDE	<None of the excluded variables exist>/info/fao=0!/ansi=0
@@ -1168,7 +1168,7 @@ DDPLOGERR	<!AD: !AD>/error/fao=4!/ansi=0
 GETSOCKNAMERR	<Getting the socket name failed from getsockname(): (errno==!UL) !AD>/error/fao=3!/ansi=0
 INVYDBEXIT	<Inappropriate invocation of ydb_exit(). Calls to ydb_exit() cannot be made from external calls.>/error/fao=0!/ansi=0
 CIMAXPARAM	<Exceeded maximum number of parameters in the call-in table entry. An M routine cannot accept more than 32 parameters.>/error/fao=0!/ansi=0
-CITPNESTED	<Call-ins can not be used inside a TP transaction>/error/fao=0!/ansi=0
+UNUSEDMSG1171	<CITPNESTED nixed in r1.20 as part of #188>/error/fao=0!/ansi=0
 CIMAXLEVELS	<Too many nested Call-ins. Nested resources exhausted at level !UL.>/error/fao=1!/ansi=0
 JOBINTRRETHROW	<Job interrupt redelivered>/error/fao=0!/ansi=0
 STARFILE	<Star(*) argument cannot be specified with !AD>/error/fao=2!/ansi=0
@@ -1338,7 +1338,7 @@ SSTMPCREATE	<Cannot create the temporary file in directory !AD for the requested
 JNLFILEDUP	<Journal files !AD and !AD are the same>/error/fao=4!/ansi=0
 SSPREMATEOF	<Premature end of file while reading block !UL of size: !UL bytes at offset: !UL from !AD>/error/fao=5!/ansi=0
 SSFILOPERR	<Error while doing !AD operation on file !AD>/error/fao=4!/ansi=0
-REGSSFAIL	<Process !UL encountered error contributing to the snapshot for region !AD - the snapshot is no longer valid>/error/fao=3!/ansi=0
+REGSSFAIL	<Process !UL encountered error !UL contributing to the snapshot for region !AD - the snapshot is no longer valid>/error/fao=4!/ansi=0
 SSSHMCLNUPFAIL	<Error while doing snapshot shared memory cleanup. Operation -- !AD. Identifier -- !UL>/error/fao=3!/ansi=0
 SSFILCLNUPFAIL	<Error while unlinking snapshot file -- !AD>/error/fao=2!/ansi=0
 SETINTRIGONLY	<ISV !AD cannot be modified outside of the trigger environment>/error/fao=2!/ansi=0
@@ -1381,7 +1381,7 @@ BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
 WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
 ZGOCALLOUTIN	<ZGOTO level 0 with entry ref not valid when using call-ins>/error/fao=0!/ansi=0
-REPLNOXENDIAN	<!AD side is running on a GT.M/YottaDB version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
+UNUSEDMSG1384	<REPLNOXENDIAN nixed in r1.24 because oldest supported version is V6.0-000 which supports cross-endian replication>/error/fao=0!/ansi=0
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
 UNUSEDMSG1386	<ZGOTOINVLVL2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0
@@ -1511,7 +1511,7 @@ SETEXTRENV	<Database files are missing or Instance is frozen; supply the databas
 NOTALLDBRNDWN	<Not all regions were successfully rundown>/error/fao=0!/ansi=0
 TPRESTNESTERR	<TP restart signaled while handing error - treated as nested error - Use TROLLBACK in error handler to avoid this>/error/fao=0!/ansi=0
 JNLFILRDOPN	<Error opening journal file !AD for read for database file !AD>/error/fao=4!/ansi=0
-SEQNUMSEARCHTIMEOUT	<Timed out trying to find sequence number !@ZQ [0x!16@XQ] in Journal File(s). See above messages for details. Source server exiting>/error/fao=2!/ansi=0
+UNUSEDMSG1514	<SEQNUMSEARCHTIMEOUT nixed in r1.24 because it was unused starting GT.M V6.3-000>/error/fao=0!/ansi=0
 FTOKKEY		<FTOK key 0x!XL>/info/fao=1!/ansi=0
 SEMID		<Semaphore id !UL>/info/fao=1!/ansi=0
 JNLQIOSALVAGE	<Journal IO lock salvaged>/info/fao=0!/ansi=0

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,10 +33,8 @@
 #include "util.h"
 #include "gdsbml.h"
 #include "gtmmsg.h"
-#include "get_spec.h"
 #include "mupip_integ.h"
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #endif
 
@@ -69,7 +67,7 @@ GBLREF int			muint_end_keyend;
 GBLREF int			muint_start_keyend;
 GBLREF int			mu_int_plen;
 GBLREF int			trans_errors;
-GBLREF int4			mu_int_adj[];
+GBLREF uint4			mu_int_adj[];
 GBLREF gtm_uint64_t		mu_int_cum[CUM_TYPE_MAX][MAX_BT_DEPTH + 1];
 GBLREF uint4			mu_int_offset[];
 GBLREF uint4			mu_int_errknt;
@@ -205,11 +203,12 @@ boolean_t mu_int_blk(
 	sub_list	mu_sub_list[MAX_GVSUBSCRIPTS + 1];
 	sub_num		check_vals;
 	trans_num	blk_tn;
-	uchar_ptr_t	subrec_ptr, free_blk_base;
+	uchar_ptr_t	free_blk_base;
 	enum db_ver	ondsk_blkver;
 	uint4		cnt, span_curr_blk, rval_len, gblsize;
 	unsigned short	numsubs;
 	unsigned int	null_subscript_cnt;
+	boolean_t	coll_ret;
 
 	mu_int_offset[mu_int_plen] = 0;
 	mu_int_path[mu_int_plen++] = blk;  /* Increment mu_int_plen on entry; decrement explicitly or via mu_int_err() on exit. */
@@ -257,7 +256,7 @@ boolean_t mu_int_blk(
 		mu_int_root_level = level = blk_levl;
 	else  if (is_root)
 	{
-		if (blk_levl >= MAX_BT_DEPTH)
+		if (MAX_BT_DEPTH <= blk_levl)
 		{
 			mu_int_err(ERR_DBRLEVTOOHI, 0, 0, 0, 0, 0, 0, (unsigned int)blk_levl);
 			free(free_blk_base);
@@ -975,18 +974,14 @@ boolean_t mu_int_blk(
 				*/
 				if (rec_size > hdr_len + SIZEOF(block_id))
 				{
-					subrec_ptr = get_spec((sm_uc_ptr_t)rec_base + hdr_len + SIZEOF(block_id),
-									(int)(rec_size - (hdr_len + SIZEOF(block_id))), COLL_SPEC);
-					if (subrec_ptr)
+					GET_GVT_COLL_INFO(trees_tail, (sm_uc_ptr_t)rec_base + hdr_len + SIZEOF(block_id),
+									(int)(rec_size - (hdr_len + SIZEOF(block_id))), coll_ret);
+					if (!coll_ret)
 					{
-						trees_tail->nct = *(subrec_ptr + COLL_NCT_OFFSET);
-						trees_tail->act = *(subrec_ptr + COLL_ACT_OFFSET);
-						trees_tail->ver = *(subrec_ptr + COLL_VER_OFFSET);
-					} else
-					{
-						trees_tail->nct = 0;
-						trees_tail->act = 0;
-						trees_tail->ver = 0;
+						mu_int_err(ERR_INVSPECREC, TRUE, TRUE, buff, comp_length, top_key, top_len,
+								(unsigned int)blk_levl);
+						free(free_blk_base);
+						return FALSE;
 					}
 				} else
 				{

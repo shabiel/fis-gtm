@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -16,7 +19,6 @@
 #include "stp_parms.h"
 #include "compiler.h"
 #include "stringpool.h"
-#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "opcode.h"
 #include "cgp.h"
@@ -28,7 +30,7 @@
  *	rts_stringpool when the compilation is finished.
  */
 GBLREF char	cg_phase;
-GBLREF int4	aligned_source_buffer, curr_fetch_count;
+GBLREF int4	curr_fetch_count;
 GBLREF spdesc	stringpool,rts_stringpool;
 GBLREF spdesc	indr_stringpool;
 GBLREF triple	*curr_fetch_trip;
@@ -40,7 +42,7 @@ void comp_init(mstr *src, oprtype *dst)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if ((MAX_SRCLINE < (unsigned)src->len) && ((TREF(source_buffer)).addr == (char *)&aligned_source_buffer))
+	if ((MAX_SRCLINE < (unsigned)src->len) && ((TREF(source_buffer)).addr == (char *)aligned_source_buffer))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);	/* no error if it's ojchildparms */
 	memcpy((TREF(source_buffer)).addr,src->addr,src->len);
 	(TREF(source_buffer)).len = src->len + 1;

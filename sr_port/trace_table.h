@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ * Copyright 2011 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,21 +53,37 @@ enum trace_types
 
 #define TRACE_TABLE_SIZE_DEFAULT 500
 
+#ifdef DEBUG
 #define TRCTBL_ENTRY(typeval, intval, addrval1, addrval2, addrval3)						\
-{														\
+MBSTART {													\
+	boolean_t	was_holder;										\
+	trctbl_entry	*trc;											\
+														\
 	/* If tracing in general, verify this group is being traced */						\
 	if ((NULL != TREF(gtm_trctbl_start)) && (0 != (TREF(gtm_trctbl_groups) & (1 << (typeval >> 16)))))	\
 	{	/* Trace only if we are tracing */								\
-		(TREF(gtm_trctbl_cur))++;	/* Next entry */						\
-		if (TREF(gtm_trctbl_cur) >= TREF(gtm_trctbl_end))						\
-			TREF(gtm_trctbl_cur) = TREF(gtm_trctbl_start);						\
-		(TREF(gtm_trctbl_cur))->type = (int4)(typeval);							\
-		(TREF(gtm_trctbl_cur))->intfld = (int4)(intval);						\
-		(TREF(gtm_trctbl_cur))->addrfld1 = (void *)(addrval1);						\
-		(TREF(gtm_trctbl_cur))->addrfld2 = (void *)(addrval2);						\
-		(TREF(gtm_trctbl_cur))->addrfld3 = (void *)(addrval3);						\
+		/* In case "simpleThreadAPI_active" is TRUE, one would be inclined to use "pthread_mutex_lock"	\
+		 * to ensure trace table accuracy across multiple calls of TRCTBL_ENTRY from concurrently	\
+		 * running threads. But it is possible one thread is in a signal handler when this macro is	\
+		 * invoked from another thread. In that case, "pthread_mutex_lock" invocation is a no-no.	\
+		 * Instead, live with some inaccuracies in the trace table entries. We try to limit the		\
+		 * probability of error by using a local variable "trc" for the most part.			\
+		 */												\
+		trc = TREF(gtm_trctbl_cur);									\
+		trc++;	/* Next entry */									\
+		if (trc >= TREF(gtm_trctbl_end))								\
+			trc = TREF(gtm_trctbl_start);								\
+		TREF(gtm_trctbl_cur) = trc;									\
+		trc->type = (int4)(typeval);									\
+		trc->intfld = (int4)(intval);									\
+		trc->addrfld1 = (void *)(addrval1);								\
+		trc->addrfld2 = (void *)(addrval2);								\
+		trc->addrfld3 = (void *)(addrval3);								\
 	}													\
-}
+} MBEND
+#else
+#define TRCTBL_ENTRY(typeval, intval, addrval1, addrval2, addrval3)
+#endif
 
 /* Structure defining the size of a single trace entry */
 typedef struct trctbl_entry_struct
@@ -76,4 +95,5 @@ typedef struct trctbl_entry_struct
 	void	*addrfld3;
 } trctbl_entry;
 
+void ydb_dmp_tracetbl(void);
 #endif

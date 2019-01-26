@@ -7,6 +7,8 @@
 # Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
+# Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -37,7 +39,7 @@ set utflocale = `locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
 # It should be manually tested using this command :
 #    ssh <some host> ls -l {/usr/local,/usr,}/lib{64,,32}/libicuio.{a,so,sl}
 
-foreach libdir ( {/usr/local,/usr,}/lib{64,/arm-linux-gnueabihf,/x86_64-linux-gnu,,32,/i386-linux-gnu}/libicuio.{a,so,sl} )
+foreach libdir ( {/usr/local,/usr,}/lib{64,/arm-linux-gnueabihf,/aarch64-linux-gnu,/x86_64-linux-gnu,,32,/i386-linux-gnu}/libicuio.{a,so,sl} )
 	# 36 is the least version GT.M supports for ICU. We have to get the numeric value from the ICU library.
 	# ICU ships libicuio.so linked to the appropriate versioned library - so using filetype -L works well
 	# The below is the format of the libraries on various platforms:

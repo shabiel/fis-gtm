@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,7 @@
  * Warning: the lists above may not be complete.
 */
 
+#include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 #include "hashtab_mname.h"
 
 typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
@@ -123,8 +124,9 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFF_UNW_SYMVAL_OFF		~(SFF_UNW_SYMVAL)		/* Mask to turn off SFF_UNW_SYMVAL */
 #define SFF_NORET_VIA_MUMTSTART_OFF	~(SFF_NORET_VIA_MUMTSTART)	/* Mask to turn off SFF_NORET_VIA_MUMTSTART */
 
-#define	CALL_IN_M_ENTRYREF	"(Call-In)"	/* M entryref equivalent for Call-In. Filled in $zstatus, ZSHOW "S" etc. */
-#define	SIMPLEAPI_M_ENTRYREF	"(SimpleAPI)"	/* M entryref equivalent for simpleAPI. Filled in $zstatus */
+#define	CALL_IN_M_ENTRYREF		"(Call-In)"	/* M entryref equivalent for Call-In. Filled in $zstatus, ZSHOW "S" etc. */
+#define	SIMPLEAPI_M_ENTRYREF		"(SimpleAPI)"		/* M entryref equivalent for SimpleAPI. Filled in $zstatus */
+#define	SIMPLETHREADAPI_M_ENTRYREF	"(SimpleThreadAPI)"	/* M entryref equivalent for SimpleThreadAPI. Filled in $zstatus */
 
 #define	ADJUST_FRAME_POINTER(fptr, shift)			\
 MBSTART {							\
@@ -140,16 +142,18 @@ MBSTART {							\
 	}							\
 } MBEND
 
-/*
- * Skip past trigger and/or call-in base frames - as many of them as appear adjacent (updates FP)
+/* Skip past trigger and/or call-in base frames - as many of them as appear adjacent (updates FP).
+ * SFT_FLAGS is set by caller to (SFT_TRIGR | SFT_CI) if they want to skip both trigger and call-in frames
+ *			or    to (SFT_CI)             if they want to skip only call-in frames.
  */
-#define SKIP_BASE_FRAMES(FP) 										\
+#define SKIP_BASE_FRAMES(FP, SFT_FLAGS)									\
 MBSTART {												\
+	assert(((SFT_TRIGR | SFT_CI) == SFT_FLAGS) || (SFT_CI == SFT_FLAGS));				\
 	if (NULL != (FP))										\
 	{												\
 		while (NULL == (FP)->old_frame_pointer)							\
 		{	/* We may need to jump over a base frame to get the rest of the M stack */	\
-			if ((SFT_TRIGR | SFT_CI) & (FP)->type) 						\
+			if (SFT_FLAGS & (FP)->type) 							\
 			{	/* We have a trigger or call-in base frame, back up over it */		\
 				FP = *(stack_frame **)((FP) + 1);					\
 				continue;								\

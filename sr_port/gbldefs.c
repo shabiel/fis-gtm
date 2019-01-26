@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,6 @@
 /* The define of CHEXPAND below causes error.h to create GBLDEFs */
 #define CHEXPAND
 #include "error.h"
-#include <rtnhdr.h>
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "ccp.h"
@@ -123,7 +122,8 @@
 #include "gtmcrypt.h"
 #include "gdsblk.h"
 #include "muextr.h"
-#include "gtmxc_types.h"
+//#include "gtmxc_types.h"
+#include "libyottadb_int.h"
 #ifdef GTM_TLS
 #include "gtm_tls_interface.h"
 #endif
@@ -746,10 +746,10 @@ GBLDEF	MIDENT_DEF(module_name, 0, &module_name_buff[0]);
 GBLDEF	MIDENT_DEF(int_module_name, 0, &int_module_name_buff[0]);
 GBLDEF	char		rev_time_buf[REV_TIME_BUFF_LEN];
 GBLDEF	unsigned short	source_name_len;
-GBLDEF	short		object_name_len;
-GBLDEF unsigned char	source_file_name[MAX_FBUFF + 1];
-GBLDEF unsigned char	object_file_name[MAX_FBUFF + 1];
-GBLDEF int		object_file_des;
+GBLDEF	unsigned short	object_name_len;
+GBLDEF	unsigned char	source_file_name[MAX_FBUFF + 1];
+GBLDEF	unsigned char	object_file_name[MAX_FBUFF + 1];
+GBLDEF	int		object_file_des;
 GBLDEF	int4		curr_addr, code_size;
 GBLDEF	mident_fixed	zlink_mname;
 GBLDEF	sm_uc_ptr_t	reformat_buffer;
@@ -1139,6 +1139,14 @@ GBLDEF	pthread_mutex_t	thread_mutex;			/* mutex structure used to ensure seriali
 							 * a bottleneck this needs to be revisited.
 							 */
 GBLDEF	pthread_t	thread_mutex_holder;		/* pid/tid of the thread that has "thread_mutex" currently locked */
+/* Even though thread_mutex_holder_[rtn,line]() are only used in a debug build, they are used in the
+ * PTHREAD_MUTEX_[UN]LOCK_IF_NEEDED macro which is used in gtm_malloc_src.h. Note that gtm_malloc_src.h is built twice in a
+ * pro build - once with the debug flag on. So even with a pro build, we still need to define these fields as they could be used
+ * with the debug build of gtm_malloc_src.h.
+ */
+GBLDEF	char		*thread_mutex_holder_rtn;	/* Routine doing the holding of the lock */
+GBLDEF	int		thread_mutex_holder_line;	/* Line number in routine where lock was acquired */
+
 GBLDEF	pthread_key_t	thread_gtm_putmsg_rname_key;	/* points to region name corresponding to each running thread */
 GBLDEF	boolean_t	thread_block_sigsent;		/* TRUE => block external signals SIGINT/SIGQUIT/SIGTERM/SIGTSTP/SIGCONT */
 GBLDEF	boolean_t	in_nondeferrable_signal_handler;	/* TRUE if we are inside "generic_signal_handler". Although this
@@ -1148,6 +1156,18 @@ GBLDEF	boolean_t	in_nondeferrable_signal_handler;	/* TRUE if we are inside "gene
 								 */
 GBLDEF	boolean_t	forced_thread_exit;		/* TRUE => signal threads to exit (likely because some thread already
 							 * exited with an error or the main process got a SIGTERM etc.)
+							 * In the case of SimpleThreadAPI, this variable signals the MAIN/TP
+							 * worker threads to exit when a logical point is reached (e.g. if we are
+							 * in middle of TP transaction in final retry, exit is deferred until
+							 * transaction is committed and crit is released).
+							 */
+GBLDEF	boolean_t	forced_simplethreadapi_exit;	/* TRUE => signal MAIN/TP worker threads in SimpleThreadAPI to exit
+							 * immediately (e.g. because the main process got a SIGTERM etc.).
+							 * Note that this is set to TRUE only when we have confirmed the MAIN/TP
+							 * worker threads are at a logical point i.e. it is possible for
+							 * "forced_thread_exit" to be TRUE but "forced_simplethreadapi_exit" to be
+							 * FALSE if we are for example in a final retry TP transaction. Both will
+							 * get set to TRUE once the transaction is committed and crit is released.
 							 */
 GBLDEF	int		next_task_index;		/* "next" task index waiting for a thread to be assigned */
 GBLDEF	int		ydb_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to use in "gtm_multi_thread"
@@ -1198,30 +1218,30 @@ GBLDEF	CLI_ENTRY	*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
 
 /* Begin -- GT.CM OMI related global variables */
 GBLDEF	bool		neterr_pending;
-GBLDEF	int4		omi_bsent = 0;
+GBLDEF	int4		omi_bsent;
 GBLDEF	int		psock = -1;		/* pinging socket */
 GBLDEF	short		gtcm_ast_avail;
 GBLDEF	int4		gtcm_exi_condition;
-GBLDEF	char		*omi_service = (char *)0;
-GBLDEF	FILE		*omi_debug   = (FILE *)0;
-GBLDEF	char		*omi_pklog   = (char *)0;
-GBLDEF	char		*omi_pklog_addr = (char *)0;
-GBLDEF	int		omi_pkdbg   = 0;
-GBLDEF	omi_conn_ll	*omi_conns   = (omi_conn_ll *)0;
-GBLDEF	int		omi_exitp   = 0;
-GBLDEF	int		omi_pid     = 0;
-GBLDEF	int4		omi_errno   = 0;
-GBLDEF	int4		omi_nxact   = 0;
-GBLDEF	int4		omi_nxact2  = 0;
-GBLDEF	int4		omi_nerrs   = 0;
-GBLDEF	int4		omi_brecv   = 0;
-GBLDEF	int4		gtcm_stime  = 0;  /* start time for GT.CM */
-GBLDEF	int4		gtcm_ltime  = 0;  /* last time stats were gathered */
-GBLDEF	int		one_conn_per_inaddr = 0;
-GBLDEF	int		authenticate = 0;   /* authenticate OMI connections */
-GBLDEF	int		ping_keepalive = 0; /* check connections using ping */
+GBLDEF	char		*omi_service;
+GBLDEF	FILE		*omi_debug;
+GBLDEF	char		*omi_pklog;
+GBLDEF	char		*omi_pklog_addr;
+GBLDEF	int		omi_pkdbg;
+GBLDEF	omi_conn_ll	*omi_conns;
+GBLDEF	int		omi_exitp;
+GBLDEF	int		omi_pid;
+GBLDEF	int4		omi_errno;
+GBLDEF	int4		omi_nxact;
+GBLDEF	int4		omi_nxact2;
+GBLDEF	int4		omi_nerrs;
+GBLDEF	int4		omi_brecv;
+GBLDEF	int4		gtcm_stime;		/* start time for GT.CM */
+GBLDEF	int4		gtcm_ltime;		/* last time stats were gathered */
+GBLDEF	int		one_conn_per_inaddr;
+GBLDEF	int		authenticate;		/* authenticate OMI connections */
+GBLDEF	int		ping_keepalive;		/* check connections using ping */
 GBLDEF	int		conn_timeout = TIMEOUT_INTERVAL;
-GBLDEF	int		history = 0;
+GBLDEF	int		history;
 /* image_id....allows you to determine info about the server by using the strings command, or running dbx */
 GBLDEF	char		image_id[256]= "image_id";
 /* End -- GT.CM OMI related global variables */
@@ -1236,3 +1256,74 @@ GBLDEF	int4		tstart_gtmci_nested_level;	/* TREF(gtmci_nested_level) at the time 
 GBLDEF	uint4		deferred_signal_handling_needed;	/* if non-zero, it means the DEFERRED_SIGNAL_HANDLING_CHECK
 								 * macro needs to do some work.
 								 */
+GBLDEF	void_ptr_t	*dlopen_handle_array;	/* Array of handles returned from various "dlopen" calls done inside YottaDB.
+						 * Used later to "dlclose" at "ydb_exit" time.
+						 */
+GBLDEF	uint4		dlopen_handle_array_len_alloc, dlopen_handle_array_len_used;	/* Allocated and Used length of the array */
+
+#ifdef YDB_USE_POSIX_TIMERS
+GBLDEF	pid_t		posix_timer_thread_id;	/* The thread id that gets the SIGALRM signal for timer pops.
+						 * If 0, this is set to a non-zero value in "sys_settimer".
+						 * This is cleared by SET_PROCESS_ID macro (e.g. any time a "fork" occurs).
+						 */
+GBLDEF	boolean_t	posix_timer_created;
+#endif
+
+/* Structures  used for the Simple Thread API */
+
+/* See the description of STMWORKQUEUEDIM in libyottadb_int.h for a better description of how this array of work queues is
+ * allocated and used. Summary is it contains one base work queue as stmWorkQueue[0] and TP_MAX_LEVEL additional work queues
+ * one for each nested TP level with one extra so that if a call is made that would trip the TPTOODEEP, we don't have to
+ * detect it in the front-end but rather wait until op_tstart() is driven in a TP thread to raise the error. It means less
+ * doubled up of checking if we can let the regular check do the right thing.
+ */
+GBLDEF	stm_workq	*stmWorkQueue[STMWORKQUEUEDIM];	/* A set of queue/thread descriptor blocks. One extra for the
+							 * main workQ and the other so we let op_tstart() raise the TP
+							 * max nesting level error instead of doing it ourselves thus
+							 * checking twice.
+							 */
+GBLDEF	stm_workq	*stmTPWorkQueue[STMWORKQUEUEDIM - 1];	/* Alternate queue main worker thread uses when TP is active.
+								 * MAIN worker thread uses queue stmTPWorkQueue[dollar_tlevel-1]
+								 * depending on the current value of "dollar_tlevel".
+								 */
+GBLDEF	stm_freeq	stmFreeQueue;			/* Structure used to maintain free queue of stm_que_ent blocks */
+GBLDEF	uint64_t	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
+/* One of the following two flags must be true - either running a threaded API or we are running something else (M-code, call-in,
+ * SimpleAPI) that is NOT threaded.
+ */
+GBLDEF	boolean_t	simpleThreadAPI_active;		/* SimpleThreadAPI is active */
+GBLDEF	boolean_t	noThreadAPI_active;		/* Any non-threaded API active (mumps, call-ins or SimpleAPI) */
+
+GBLDEF	pthread_mutex_t	ydb_engine_threadsafe_mutex = PTHREAD_MUTEX_INITIALIZER;/* Single thread YottaDB engine access
+										 * (e.g. ydb_init/ydb_exit()) to gate
+										 * users so critical functions are safe.
+										 */
+GBLDEF	pthread_t	ydb_engine_threadsafe_mutex_holder;	/* tid of thread that has YottaDB engine mutex currently locked.
+								 * Currently used only by "gtmci_ch".
+								 */
+GBLDEF	int		fork_after_ydb_init;	/* Set to a non-zero value if a "fork" occurs after "ydb_init_complete" has been
+						 * set to TRUE. Used for handling/detecting error scenarios in SimpleAPI and
+						 * SimpleThreadAPI.
+						 */
+GBLDEF siginfo_t		exi_siginfo;		/* Holds the "info" parameter passed by OS in "generic_signal_handler" */
+GBLDEF gtm_sigcontext_t 	exi_context;		/* Holds the "context" parameter passed by OS in "generic_signal_handler" */
+GBLDEF int			exi_signal_forwarded;	/* 0 if no signal forwarding happened in "generic_signal_handler".
+							 * Non-zero signal number if forwarding did happen. In that case,
+							 * "exi_siginfo" and "exi_context" store the "info" and "context"
+							 * passed into "generic_signal_handler" (by the OS) before the
+							 * forwarding. This way we do not lose the original information
+							 * (e.g. if another process-id sent us the signal, forwarding the
+							 * signal from one thread to another thread in the same process
+							 * causes the signal to be treated as having originated in the
+							 * same process and thus loses the sending pid information).
+							 * For example, sending SIGQUIT/SIG-3 should show up as KILLBYSIGUINFO
+							 * but would show up as KILLBYSIGSINFO1 without the pre-forwarding store.
+							 */
+GBLDEF 	struct sigaction	orig_sig_action[NSIG + 1];	/* Array of signal handlers (indexed by signal number) that were
+								 * in-place when YDB initialized.
+								 */
+GBLDEF	boolean_t		safe_to_fork_n_core;	/* Set to TRUE by the MAIN worker thread in "generic_signal_handler"
+							 * to indicate to another thread that forwarded an exit signal
+							 * to invoke "gtm_fork_n_core". The MAIN worker thread will pause while
+							 * that happens.
+							 */

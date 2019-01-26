@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -266,8 +269,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		DBGSOCK((stdout, "socrfl: .. mv_stent found - bytes_read: %d  chars_read: %d  max_bufflen: %d"
 			 "  interrupts: %d\n", bytes_read, chars_read, max_bufflen, socketus_interruptus));
 		DBGSOCK((stdout, "socrfl: .. msec_timeout: %d\n", msec_timeout));
-		DBGSOCK_ONLY2(if (sockintr->end_time_valid) DBGSOCK((stdout, "socrfl: .. endtime: %d/%d\n", end_time.at_sec,
-								     end_time.at_usec)));
+		DBGSOCK_ONLY2(if (sockintr->end_time_valid) DBGSOCK((stdout, "socrfl: .. endtime: %d/%d\n", end_time.tv_sec,
+								     end_time.tv_nsec / NANOSECS_IN_USEC)));
 		DBGSOCK((stdout, "socrfl: .. buffer address: 0x"lvaddr"  stringpool: 0x"lvaddr"\n",
 			 buffer_start, stringpool.free));
 		if (!IS_AT_END_OF_STRINGPOOL(buffer_start, bytes_read))
@@ -327,14 +330,14 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			do_delim_conv = TRUE;
 	}
 	need_get_chset = FALSE;		/* if we change ichset, make sure converter available */
-	time_for_read.at_sec  = 0;
+	time_for_read.tv_sec  = 0;
 	if (0 == msec_timeout)
-		time_for_read.at_usec = 0;
+		time_for_read.tv_nsec = 0;
 	else
-		time_for_read.at_usec = (socketptr->def_moreread_timeout ? socketptr->moreread_timeout : INITIAL_MOREREAD_TIMEOUT)
-					* MICROSECS_IN_MSEC;
+		time_for_read.tv_nsec = (socketptr->def_moreread_timeout ? socketptr->moreread_timeout : INITIAL_MOREREAD_TIMEOUT)
+					* NANOSECS_IN_MSEC;
 	DBGSOCK((stdout, "socrfl: moreread_timeout = %d def_moreread_timeout= %d time = %d \n",
-		 socketptr->moreread_timeout, socketptr->def_moreread_timeout, time_for_read.at_usec));
+		 socketptr->moreread_timeout, socketptr->def_moreread_timeout, time_for_read.tv_nsec / NANOSECS_IN_USEC));
 	timer_id = (TID)iosocket_readfl;
 	out_of_time = FALSE;
 	if (NO_M_TIMEOUT == msec_timeout)
@@ -376,8 +379,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 				 */
 			 	end_time = sockintr->end_time;	 /* Restore end_time for timeout */
 				cur_time = sub_abs_time(&end_time, &cur_time);
-				msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
-						DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+				msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
+						DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
 				if (0 >= msec_timeout)
 				{
 					msec_timeout = -1;
@@ -533,9 +536,9 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			{
 				one_read_done = TRUE;
 				DBGSOCK((stdout, "socrfl: before moreread_timeout = %d timeout = %d \n",
-					 socketptr->moreread_timeout, time_for_read.at_usec));
-				time_for_read.at_usec = DEFAULT_MOREREAD_TIMEOUT * MICROSECS_IN_MSEC;
-				DBGSOCK((stdout, "socrfl: after timeout = %d \n", time_for_read.at_usec));
+					 socketptr->moreread_timeout, time_for_read.tv_nsec / NANOSECS_IN_USEC));
+				time_for_read.tv_nsec = DEFAULT_MOREREAD_TIMEOUT * NANOSECS_IN_MSEC;
+				DBGSOCK((stdout, "socrfl: after timeout = %d \n", time_for_read.tv_nsec / NANOSECS_IN_USEC));
 			}
 			DBGSOCK((stdout, "socrfl: Bytes read: %d\n", status));
 			bytes_read += (int)status;
@@ -766,13 +769,25 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		 * that we are explicitly not handling jobinterrupt outofband here because it is handled above where it needs
 		 * to be done to be able to cleanly requeue any input (before delimiter procesing).
 		 */
-		if ((chars_read >= width) ||
-		    (MAX_STRLEN <= orig_bytes_read) ||
-		    (vari && !has_delimiter && (0 != chars_read) && !more_data) ||
-		    ((0 < status) && terminator))
+		if ((chars_read >= width)
+				|| (MAX_STRLEN <= orig_bytes_read)
+				|| (vari && !has_delimiter && (0 != chars_read) && !more_data)
+				|| ((0 < status) && terminator))
 			break;
 		if (0 != outofband)
-		{
+		{	/* Record the fact that we did see "outofband" while we were still not done with the read.
+			 * Note: One might be tempted to eliminate the "outofband_terminate" local variable and instead
+			 * use the global "outofband" where "outofband_terminate" is used in an if check down below.
+			 * But that is incorrect since the if "outofband" check would succeed in case we did a "break"
+			 * in the immediately previous "if" check above in case the "((0 < status) && terminator)" clause
+			 * turned out to be TRUE. In that case, we got just a terminator in the read and already reduced
+			 * bytes_read/chars_read to not count the terminator byte/character and so if we go down the
+			 * if "outofband" check down below, we would incorrectly save no byte/char as having been read
+			 * as part of the job interrupt which would mean we will merge the current read line with the
+			 * next read line and incorrectly return the two together as the result of one READ. To avoid
+			 * that we want to do the job interrupt save only if we notice outofband non-zero after having done
+			 * the "((0 < status) && terminator)" check. Hence the need for the "outofband_terminate" local variable.
+			 */
 			outofband_terminate = TRUE;
 			break;
 		}
@@ -782,7 +797,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			{
 				sys_get_curr_time(&cur_time);
 				cur_time = sub_abs_time(&end_time, &cur_time);
-				if (0 > cur_time.at_sec)
+				if (0 > cur_time.tv_sec)
 				{
 					out_of_time = TRUE;
 					cancel_timer(timer_id);
@@ -821,39 +836,41 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			DBGSOCK((stdout, "socrfl: Out of time to be returned (2)\n"));
 		}
 	}
-	/* If we terminated due to outofband, set up restart info. We may or may not restart (any outofband is capable of
-	 * restart) but set it up for at least the more common reasons (^C and job interrupt).
-	 *
+	/* If we terminated due to outofband, set up restart info if it is a restartable outofband.
 	 * Some restart info is kept in our iodesc block, but the buffer address information is kept in an mv_stent so if
 	 * the stack is garbage collected during the interrupt we don't lose track of where our stuff is saved away.
 	 */
 	if (outofband_terminate)
 	{
-		DBGSOCK((stdout, "socrfl: outofband interrupt received (%d) -- queueing mv_stent for read intr\n", outofband));
-		PUSH_MV_STENT(MVST_ZINTDEV);
-		mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
-		mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
-		mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
-		mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = bytes_read;
-		sockintr->who_saved = sockwhich_readfl;
-		if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+		if (OUTOFBAND_RESTARTABLE(outofband))
 		{
-			sockintr->end_time = end_time;
-			sockintr->end_time_valid = TRUE;
-			cancel_timer(timer_id);		/* Worry about timer if/when we come back */
+			DBGSOCK((stdout, "socrfl: outofband interrupt received (%d) -- queueing mv_stent for read intr\n",
+														outofband));
+			PUSH_MV_STENT(MVST_ZINTDEV);
+			mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
+			mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
+			mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
+			mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = bytes_read;
+			sockintr->who_saved = sockwhich_readfl;
+			if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+			{
+				sockintr->end_time = end_time;
+				sockintr->end_time_valid = TRUE;
+				cancel_timer(timer_id);		/* Worry about timer if/when we come back */
+			}
+			sockintr->max_bufflen = max_bufflen;
+			sockintr->bytes_read = bytes_read;
+			sockintr->chars_read = chars_read;
+			dsocketptr->mupintr = TRUE;
+			stringpool.free += bytes_read;	/* Don't step on our parade in the interrupt */
+			socketus_interruptus++;
+			DBGSOCK((stdout, "socrfl: .. mv_stent: bytes_read: %d  chars_read: %d  max_bufflen: %d  "
+				 "interrupts: %d  buffer_start: 0x"lvaddr"\n",
+				 bytes_read, chars_read, max_bufflen, socketus_interruptus, stringpool.free));
+			DBGSOCK_ONLY(if (sockintr->end_time_valid) DBGSOCK((stdout, "socrfl: .. endtime: %d/%d  msec_timeout: %d\n",
+									    end_time.tv_sec, end_time.tv_nsec / NANOSECS_IN_USEC, msec_timeout)));
+			TRCTBL_ENTRY(SOCKRFL_OUTOFBAND, bytes_read, (INTPTR_T)chars_read, stringpool.free, NULL); /* BYPASSOK */
 		}
-		sockintr->max_bufflen = max_bufflen;
-		sockintr->bytes_read = bytes_read;
-		sockintr->chars_read = chars_read;
-		dsocketptr->mupintr = TRUE;
-		stringpool.free += bytes_read;	/* Don't step on our parade in the interrupt */
-		socketus_interruptus++;
-		DBGSOCK((stdout, "socrfl: .. mv_stent: bytes_read: %d  chars_read: %d  max_bufflen: %d  "
-			 "interrupts: %d  buffer_start: 0x"lvaddr"\n",
-			 bytes_read, chars_read, max_bufflen, socketus_interruptus, stringpool.free));
-		DBGSOCK_ONLY(if (sockintr->end_time_valid) DBGSOCK((stdout, "socrfl: .. endtime: %d/%d  msec_timeout: %d\n",
-								    end_time.at_sec, end_time.at_usec, msec_timeout)));
-		TRCTBL_ENTRY(SOCKRFL_OUTOFBAND, bytes_read, (INTPTR_T)chars_read, stringpool.free, NULL);	/* BYPASSOK */
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		outofband_action(FALSE);
 		assertpro(FALSE);	/* Should *never* return from outofband_action */

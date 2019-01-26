@@ -437,7 +437,7 @@ gd_region *dbfilopn(gd_region *reg)
 	int			status;
 	boolean_t		raw;
 	boolean_t		open_read_only;
-	int			stat_res, rc, save_errno;
+	int			stat_res, rc, save_errno, len;
 	sgmnt_addrs		*csa;
 	sgmnt_data		tsdbuff;
 	sgmnt_data_ptr_t        tsd;
@@ -488,10 +488,17 @@ gd_region *dbfilopn(gd_region *reg)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	}
 	assert(((int)pblk.b_esl + 1) <= SIZEOF(seg->fname));
+	/* If a remote nodename has been specified with the @ syntax, pblk.l_node points to the character past the '@'
+	 * whereas pblk.buffer points to the '@' so use pblk.l_node in that case. In case a remote nodename has
+	 * been specified without the '@' syntax, pblk.l_node points to the same character as pblk.buffer.
+	 * In case no remote nodename is specified, pblk.l_node is uninitialized and pblk.buffer should be used.
+	 * So in case a remote nodename is specified, use pblk.l_node and use pblk.buffer otherwise.
+	 */
+	len = ('@' == *pblk.buffer) ? pblk.b_esl + 1 : pblk.b_esl;
 	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
-	pblk.buffer[pblk.b_esl] = 0;
-	seg->fname[pblk.b_esl] = 0;
-	seg->fname_len = pblk.b_esl;
+	pblk.buffer[len] = 0;
+	seg->fname[len] = 0;
+	seg->fname_len = len;
 	if (pblk.fnb & F_HAS_NODE)
 	{	/* Remote node specification given */
 		assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
@@ -745,7 +752,9 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
 	if (!mutex_per_process_init_pid)
 		mutex_per_process_init();
-	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, gethostname_res))
+	/* Since "gethostname" does not ensure null termination, do it ourselves by passing in 1 lesser size */
+	machine_name[MAX_MCNAMELEN - 1] = '\0';
+	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN - 1, gethostname_res))
 		RTS_ERROR(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Unable to get the hostname"), errno);
 	if (WBTEST_ENABLED(WBTEST_TAMPER_HOSTNAME))
 		STRCPY(machine_name, "s_i_l_l_y");

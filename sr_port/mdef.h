@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -147,16 +147,6 @@ error_def(ERR_ASSERT);
 #	define	FD_INVALID_NONPOSIX	 0	/* fd of 0 is invalid in VMS if using RMS sys$open calls (non-posix interface) */
 #endif
 
-#if defined(UNIX)
-#	define	USE_POLL
-#	define	POLL_ONLY(X)	X
-#	define	SELECT_ONLY(X)
-#else
-#	define	USE_SELECT
-#	define	POLL_ONLY(X)
-#	define	SELECT_ONLY(X)	X
-#endif
-
 /* INTPTR_T is an integer that has the same length as a pointer on each platform.  Its basic use is for arithmetic
  * or generic parameters.
  */
@@ -198,9 +188,11 @@ typedef UINTPTR_T uintszofptr_t;
 #ifdef __linux__
 #	define LINUX_ONLY(X) X
 #	define NON_LINUX_ONLY(X)
+#	define YDB_USE_POSIX_TIMERS
 #else
 #	define LINUX_ONLY(X)
 #	define NON_LINUX_ONLY(X) X
+#	undef  YDB_USE_POSIX_TIMERS
 #endif
 
 #ifdef __MVS__
@@ -219,7 +211,8 @@ typedef UINTPTR_T uintszofptr_t;
 #	define UNALIGNED_ACCESS_SUPPORTED
 #endif
 
-#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun) || defined(__armv6l__) || defined(__armv7l__)
+#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun)							\
+		|| defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
 #	define GTM_PTHREAD
 #	define GTM_PTHREAD_ONLY(X) X
 #	define NON_GTM_PTHREAD_ONLY(X)
@@ -257,36 +250,37 @@ typedef UINTPTR_T uintszofptr_t;
 #define NON_X86_64_ONLY(x)    		x
 #endif /* __x86_64__ */
 
-#if defined(__armv6l__) || defined(__armv7l__)
-#define ARM32_ONLY(x)			x
-#define NON_ARM32_ONLY(x)
+#if defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
+#define ARM_ONLY(x)			x
+#define NON_ARM_ONLY(x)
 #else
-#define ARM32_ONLY(x)
-#define NON_ARM32_ONLY(x)    		x
-#endif /* __armv6l__ || __armv7l__ */
+#define ARM_ONLY(x)
+#define NON_ARM_ONLY(x)    		x
+#endif /* __armv6l__ || __armv7l__ || __aarch64__ */
 
-#if defined(__x86_64__) || defined(__armv6l__) || defined(__armv7l__)
-#define	X86_64_OR_ARM32_ONLY(x)		x
-#define	NON_X86_64_OR_ARM32_ONLY(x)
+#if defined(__x86_64__) || defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
+#define	X86_64_OR_ARM_ONLY(x)		x
+#define	NON_X86_64_OR_ARM_ONLY(x)
 #else
-#define	X86_64_OR_ARM32_ONLY(x)
-#define	NON_X86_64_OR_ARM32_ONLY(x)	x
+#define	X86_64_OR_ARM_ONLY(x)
+#define	NON_X86_64_OR_ARM_ONLY(x)	x
 #endif
 
 #if defined(__i386) || defined(__x86_64__) || defined(__ia64) || defined(__MVS__) || defined(Linux390)
-#define NON_RISC_ONLY(x)	x
-#define RISC_ONLY(x)
-#elif defined(__sparc) || defined(_AIX) || defined(__alpha) || defined(__armv6l__) || defined(__armv7l__)
-#define RISC_ONLY(x)		x
-#define NON_RISC_ONLY(x)
-#endif
-
-#if defined(__armv6l__) || defined(__armv7l__)
-#	define ARM_ONLY(x)	x
-#	define NON_ARM_ONLY(x)
-#else
-#	define ARM_ONLY(x)
-#	define NON_ARM_ONLY(x)	x
+#    define NON_RISC_ONLY(x)		x
+#    define RISC_ONLY(x)
+#    define AARCH64_RISC_ONLY(x)
+#    define NON_AARCH64_RISC_ONLY(x)
+#elif defined(__sparc) || defined(_AIX) || defined(__alpha) || defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
+#    define RISC_ONLY(x)		x
+#    define NON_RISC_ONLY(x)
+#    if defined(__aarch64__)
+#	define AARCH64_RISC_ONLY(x)	x
+#	define NON_AARCH64_RISC_ONLY(x)
+#    else
+#	define AARCH64_RISC_ONLY(x)
+#	define NON_AARCH64_RISC_ONLY(x)	x
+#    endif
 #endif
 
 #ifdef _AIX
@@ -358,8 +352,9 @@ typedef struct
  * initialize literal_ptr field apppropriately.
  *
  */
-#if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__sparc) || defined(__MVS__) || (defined(__linux__) &&  \
-	(defined(__ia64) || defined(__x86_64__) || defined(__s390__) || defined(__armv6l__) || defined(__armv7l__)))
+#if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__sparc) || defined(__MVS__)				\
+		|| (defined(__linux__) && (defined(__ia64) || defined(__x86_64__) || defined(__s390__) || defined(__armv6l__)	\
+					   || defined(__armv7l__) || defined(__aarch64__)))
 #	define HAS_LITERAL_SECT
 #endif
 
@@ -1238,7 +1233,7 @@ typedef INTPTR_T  ptroff_t;
 */
 
 #ifdef CACHELINE_SIZE
-# define CACHELINE_PAD(fieldSize, fillnum) char fill_cacheline##fillnum[CACHELINE_SIZE - (fieldSize)];
+# define CACHELINE_PAD(fieldSize, fillnum) char fill_cacheline##fillnum[CACHELINE_SIZE - (fieldSize)]
 #else
 # define CACHELINE_PAD(fieldSize, fillnum)
 #endif
@@ -1758,7 +1753,7 @@ typedef enum
 
 /* Encryption- and TLS-related macros */
 #if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__s390__)		\
-	|| defined(__armv6l__) || defined(__armv7l__)
+	|| defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
 # define GTM_TLS
 # define GTMTLS_ONLY(X)			X
 # define GTMTLS_ONLY_COMMA(X)		, X
@@ -1857,25 +1852,10 @@ enum
 #define OPERATOR_LOG_MSG
 #endif
 
-#ifdef GTM_PTHREAD
-/* If we detect a case when the signal came to a thread other than the main GT.M thread, this macro will redirect the signal to the
- * main thread if such is defined. Such scenarios is possible, for instance, if we are running along a JVM, which, upon receiving a
- * signal, dispatches a new thread to invoke signal handlers other than its own. The pthread_kill() enables us to target the signal
- * to a specific thread rather than rethrow it to the whole process.
- */
-#define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIG)								\
-{														\
-	GBLREF pthread_t	gtm_main_thread_id;								\
-	GBLREF boolean_t	gtm_main_thread_id_set;								\
-														\
-	if (gtm_main_thread_id_set && !pthread_equal(gtm_main_thread_id, pthread_self()))			\
-	{	/* Only redirect the signal if the main thread ID has been defined, and we are not that. */	\
-		pthread_kill(gtm_main_thread_id, SIG);								\
-		return;												\
-	}													\
-}
+#ifdef __linux__
+# define CURRENT_PC __builtin_return_address(0)
 #else
-#define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIG)
+# define CURRENT_PC NULL
 #endif
 
 #ifdef DEBUG
@@ -1912,4 +1892,16 @@ enum
 # define ASSERT_IS_LIBGTCM
 #endif
 
+/* HDR_FILE_INCLUDE_SYNTAX :
+ * There are a few header files that exist in multiple sr_* directories.
+ * For example,
+ *	./sr_unix/rtnhdr.h
+ *	./sr_unix_nsb/rtnhdr.h
+ * Whenever we have such a header file, it needs to be included using <> syntax and not "" syntax.
+ * This is because, even though this is not a system-header file, but is a user-defined header file,
+ * if the C file doing including rtnhdr.h is found in sr_unix, sr_unix/rtnhdr.h would be picked by the
+ * compiler (because it is in the same directory as the including C file) if the "" syntax is used
+ * even though the correct file to pick up is sr_unix_nsb/rtnhdr.h. Using the <> syntax avoids this issue.
+ * This block of comment is here as a marker so all such non-intuitive include usages reference this.
+ */
 #endif /* MDEF_included */

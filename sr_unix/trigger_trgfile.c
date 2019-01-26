@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,7 +23,6 @@
 #include "gdsroot.h"			/* for gdsfhead.h */
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"			/* For gvcst_protos.h */
-#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "io.h"
 #include "hashtab_str.h"
@@ -99,7 +101,9 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 	char			*trigger_rec;
 	char			*values[NUM_SUBS];
 	unsigned short		value_len[NUM_SUBS];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (lcl_implicit_tpwrap)
 		ESTABLISH_RET(trigger_tpwrap_ch, TRIG_FAILURE);	/* Return through here is a failure */
 	io_save_device = io_curr_device;

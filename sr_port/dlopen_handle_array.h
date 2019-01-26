@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,14 +10,10 @@
  *								*
  ****************************************************************/
 
-#include <signal.h>
-#ifndef GTMCI_SIGNALS_H
-#define GTMCI_SIGNALS_H
+#ifndef DLOPEN_HANDLE_ARRAY_included
+#define DLOPEN_HANDLE_ARRAY_included
 
-void 	sig_save_ext(struct sigaction* act);
-void 	sig_save_gtm(void);
-void	sig_switch_gtm(void);
-void	sig_switch_ext(void);
-void 	gtmci_exit_handler(void);
+void	dlopen_handle_array_add(void_ptr_t handle);
+void	dlopen_handle_array_close(void);
 
-#endif
+#endif /* DLOPEN_HANDLE_ARRAY_included */

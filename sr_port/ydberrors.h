@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,3 +33,14 @@
 #define ERR_CALLINTCOMMIT 151027858
 #define ERR_CALLINTROLLBACK 151027866
 #define ERR_TCPCONNTIMEOUT 151027874
+#define ERR_STDERRALREADYOPEN 151027882
+#define ERR_SETENVFAIL 151027890
+#define ERR_UNSETENVFAIL 151027898
+#define ERR_UNKNOWNSYSERR 151027906
+#define ERR_STRUCTNOTALLOCD 151027914
+#define ERR_NODEEND 151027922
+#define ERR_INVLNPAIRLIST 151027930
+#define ERR_INVTPTRANS 151027938
+#define ERR_THREADEDAPINOTALLOWED 151027946
+#define ERR_SIMPLEAPINOTALLOWED 151027954
+#define ERR_STAPIFORKEXEC 151027962

@@ -3,7 +3,7 @@
  * Copyright (c) 2009, 2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,6 @@
 
 #include <stddef.h>
 
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
 #include "stp_parms.h"
@@ -57,7 +56,6 @@ GBLREF zwr_hash_table	*zwrhtab;
 GBLREF trans_num	local_tn;					/* transaction number for THIS PROCESS */
 GBLREF uint4		tstartcycle;
 GBLREF uint4		lvtaskcycle;					/* lv_val cycle for misc lv_val related tasks */
-GBLREF lv_val		*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF tp_frame		*tp_pointer;
 GBLREF int4		SPGC_since_LVGC;				/* stringpool GCs since the last dead-data GC */
 GBLREF boolean_t	suspend_lvgcol;
@@ -269,6 +267,7 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 	{	/* Once through for each stackframe using the same symbol table. Note this loop is similar
 		 * to the stack frame loop in op_clralsvars.c.
 		 */
+		SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 		if (fp->l_symtab != last_lsym_hte)
 		{	/* Different l_symtab than last time (don't want to update twice) */
 			last_lsym_hte = fp->l_symtab;
@@ -296,10 +295,10 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 		fp = fp->old_frame_pointer;	/* Bump to prev frame and check if found a call-in base frame */
 		if (done)
 			break;
-		SKIP_BASE_FRAMES(fp);		/* Updates fp */
-		if ((NULL == fp) || (fp >= (stack_frame *)stackbase) || (fp < (stack_frame *)stacktop))
-			break;	/* Pointer not within the stack -- must be earliest occurence */
-	} while(fp);
+		if (NULL == fp)
+			break;
+		assert(IS_PTR_INSIDE_M_STACK(fp));
+	} while(TRUE);
 	/* Next, check the mv_stents for the stackframes we processed. Certain mv_stents also have hash
 	 * table references in them that need repair.
 	 */
@@ -390,13 +389,14 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 	lv_val			*lv, *prevlv, *currlv, *popdlv;
 	lv_val			*newlv, *oldlv;
 	boolean_t		bypass_lvscan, bypass_lvrepl;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(als_check_xnew_var_aliases_ch);
 	suspend_lvgcol = TRUE;
 	assert(NULL != popdsymval);
 	assert(NULL != cursymval);
 	assert((NULL != popdsymval->xnew_var_list) || (NULL != alias_retarg));
-
 	DBGRFCT((stderr, "\nals_check_xnew_var_aliases: Beginning xvar pop processing\n"));
 	/* Step 2: (step 1 done in op_xnew()) - Run the list of vars that were passed through the xnew and remove them
 	 * from the popped hash table so they can not be found by the step 3 scan below - meaning we won't mess with the

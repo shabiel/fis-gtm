@@ -366,7 +366,8 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					if ((0 < field_width) && (cwidth > field_width))
 						cwidth = field_width;
 					assert(0 <= cwidth); /* since all unprintable and illegal characters are ignored */
-				}
+				} else
+					cwidth = 0;	/* this is an unknown character so set its width to 0 */
 				assert(0 <= field_width);
 				outtop1 = outtop - 1;
 				if (right_justify)
@@ -720,7 +721,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 		{	/* Read instace file name from jnlpool */
 			INSERT_MARKER;
 			BUILD_FACILITY((char *)jnlpool->repl_inst_filehdr->inst_info.this_instname);
-		} else
+		} else if (!process_exiting)
 		{	/* Read instance name from instance file */
 			fn_len = &file_name_len;
 			bufsize = MAX_FN_LEN + 1;
@@ -745,6 +746,15 @@ void	util_out_send_oper(char *addr, unsigned int len)
 					CLOSEFILE_RESET(fd, status);
 				}
 			}
+		} else
+		{	/* Process is exiting. If we don't already have access to the instance name, it is safer to proceed
+			 * with process exit without trying to get the name. For example, if we are in the exit handler
+			 * because of a YDB-F-MEMORY error, trying to get the instance file name could end up requiring
+			 * memory (either in the stack or heap) and we might run out of it resulting in secondary issues.
+			 * Just like we ignored any errors while trying to find the name (in OPENFILE and LSEEKREAD above)
+			 * we will treat this as an error and get by without the replication instance name. So no usages
+			 * if INSERT_MARKER or BUILD_FACILITY here.
+			 */
 		}
 		DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
 		(void)OPENLOG(facility, get_syslog_flags(), LOG_USER);

@@ -52,6 +52,7 @@
 #include "tp.h"
 #include "cli.h"
 #include "repl_filter.h"
+#include "gds_blk_upgrade.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -252,6 +253,8 @@ void	gtm_env_init(void)
 		ret = ydb_logical_truth_value(YDBENVINDX_LCT_STDNULL, FALSE, &is_defined);
 		if (is_defined)
 			TREF(local_collseq_stdnull) = ret;
+		else
+			TREF(local_collseq_stdnull) = TRUE;
 		/* Initialize eXclusive Kill variety (GTM vs M Standard) */
 		ret = ydb_logical_truth_value(YDBENVINDX_STDXKILL, FALSE, &is_defined);
 		if (is_defined)
@@ -263,6 +266,9 @@ void	gtm_env_init(void)
 		wbox_test_init();
 		/* Initialize variable that controls dynamic block upgrade */
 		ydb_blkupgrade_flag = ydb_trans_numeric(YDBENVINDX_BLKUPGRADE_FLAG, &is_defined, IGNORE_ERRORS_TRUE, NULL);
+		/* If ydb_blkupgrade_flag is outside of valid range of choices, set it back to default value */
+		if ((UPGRADE_NEVER != ydb_blkupgrade_flag) && (UPGRADE_ALWAYS != ydb_blkupgrade_flag))
+			ydb_blkupgrade_flag = UPGRADE_IF_NEEDED;
 		/* Initialize whether database file extensions need to be logged in the operator log */
 		ret = ydb_logical_truth_value(YDBENVINDX_DBFILEXT_SYSLOG_DISABLE, FALSE, &is_defined);
 		if (is_defined)
@@ -307,7 +313,7 @@ void	gtm_env_init(void)
 												IGNORE_ERRORS_TRUE, NULL)))
 		{
 			assert(SIZEOF(buf) > trans.len);
-			*(char *)(buf + trans.len) = 0;
+			assert('\0' == buf[trans.len]);
 			errno = 0;
 			time = strtod(buf, NULL);
 			if ((ERANGE != errno) && (TPNOTACID_MAX_TIME >= time))
@@ -337,6 +343,7 @@ void	gtm_env_init(void)
 		ret = ydb_logical_truth_value(YDBENVINDX_ENVIRONMENT_INIT, FALSE, &is_defined);
 		if (is_defined)
 			TREF(ydb_environment_init) = TRUE; /* in-house */
+#		ifdef DEBUG
 		/* See if a trace table is desired. If we have been asked to trace one or more groups, we also
 		 * see if a specific size has been specified. A default size is provided.
 		 */
@@ -358,6 +365,7 @@ void	gtm_env_init(void)
 				}
 			}
 		}
+#		endif
 		/* Initialize jnl_extract_nocol */
 		TREF(jnl_extract_nocol) = ydb_trans_numeric(YDBENVINDX_EXTRACT_NOCOL, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		/* Initialize dollar_zmaxtptime */

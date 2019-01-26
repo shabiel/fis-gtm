@@ -3,6 +3,9 @@
 ; Copyright (c) 2006-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -66,8 +69,8 @@ GDEPUT()
 	s rec=rec_$$num2bin(4,hasSpanGbls)			; has_span_gbls
 	s rec=rec_filler12byte					; for runtime filler
 	s rec=hdrlab_$$num2bin(4,$l(hdrlab)+4+filesize)_rec
-	i create zm gdeerr("GDCREATE"):file
-	e  zm gdeerr("GDUPDATE"):file
+	i create d message^GDE(gdeerr("GDCREATE"),$zwrite(file))
+	e  d message^GDE(gdeerr("GDUPDATE"),$zwrite(file))
 	s gdexcept="s gdeputzs=$zs  zgoto "_$zl_":writeerr^GDEPUT"
 	s tempfile=file_"inprogress"
 	;if zchset is UTF-8 open in raw mode to avoid BADCHAR errors
@@ -99,10 +102,10 @@ GDEPUT()
 ; templates
 	new x
 	s x=tmpreg("STATS"),tmpreg("AUTODB")='x*2+tmpreg("AUTODB") k tmpreg("STATS")	;combine items for bit mask - restore below
-	s tmpreg("LOCK_CRIT")='tmpreg("LOCK_CRIT")					; again an adjustment before and after
+	s tmpreg("LOCK_CRIT_SEPARATE")='tmpreg("LOCK_CRIT_SEPARATE")			; again an adjustment before and after
 	f  s s=$o(tmpreg(s)) q:'$l(s)  s rec=rec_$tr($j($l(tmpreg(s)),3)," ",0) s rec=rec_tmpreg(s)
 	s tmpreg("STATS")=x,tmpreg("AUTODB")=tmpreg("AUTODB")#2				; save/restore cheaper than checking in loop
-	s tmpreg("LOCK_CRIT")='tmpreg("LOCK_CRIT")					; restore GDE representation
+	s tmpreg("LOCK_CRIT_SEPARATE")='tmpreg("LOCK_CRIT_SEPARATE")			; restore GDE representation
 	f i=2:1:$l(accmeth,"\") s am=$p(accmeth,"\",i) s s="" d
 	. f  s s=$o(tmpseg(am,s)) q:'$l(s)  s rec=rec_$tr($j($l(tmpseg(am,s)),3)," ",0),rec=rec_tmpseg(am,s)
 	u tempfile
@@ -234,7 +237,7 @@ cregion:
 	s rec=rec_$$num2bin(4,maxregindex)							; statsDB_reg_index
 	s rec=rec_$$num2bin(1,regs(s,"EPOCHTAPER"))						; epoch tapering
 	s rec=rec_$$num2bin(1,((s?1L.E)*4)+(('regs(s,"STATS"))*2)+regs(s,"AUTODB"))		; type of reserved DB
-	s rec=rec_$$num2bin(1,'regs(s,"LOCK_CRIT"))						; LOCK crit with DB (1) or not (0)
+	s rec=rec_$$num2bin(1,'regs(s,"LOCK_CRIT_SEPARATE"))					; LOCK crit with DB (1) or not (0)
 	s rec=rec_filler45byte									; runtime filler
 	s rec=rec_$tr($j("",SIZEOF("gd_region_padding"))," ",ZERO)				; padding
 	q
@@ -330,7 +333,7 @@ fatal:(msgno)
 error1:
 	s $et="d ABORT^GDE"
 	c tempfile:delete
-	zm $$fatal(gdeerr("VERIFY")):"FAILED"
+	d message^GDE($$fatal(gdeerr("VERIFY")),"""FAILED""")
 	;
 writerec:
 	n len
@@ -345,5 +348,5 @@ writerec:
 writeerr
 	u @useio
 	c tempfile:delete
-	zm gdeerr("WRITEERROR"):gdeputzs
+	d message^GDE(gdeerr("WRITEERROR"),$zwrite(gdeputzs))
 	q 0

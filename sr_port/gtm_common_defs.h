@@ -6,6 +6,8 @@
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
+ * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -15,7 +17,7 @@
 #ifndef GTM_COMMON_DEFS_H
 #define GTM_COMMON_DEFS_H
 
-#if defined(__x86_64__) || defined(__s390__) || defined (_AIX)
+#if defined(__x86_64__) || defined(__s390__) || defined (_AIX) || defined (__aarch64__)
 #  define GTM64
 #endif
 

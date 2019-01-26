@@ -20,7 +20,6 @@
 #endif
 #include "error.h"
 #include "indir_enum.h"
-#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "stringpool.h"
@@ -104,7 +103,9 @@ CONDITION_HANDLER(zyerr_ch)
 void trans_code_finish(void)
 {
 	mval		dummy;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	frame_pointer->type = proc_act_type;
 	proc_act_type = 0;
 	/* Save/restore restart_pc over dispatch of this error handler */

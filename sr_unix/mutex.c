@@ -133,7 +133,7 @@ MBSTART {															\
 		{														\
 			sys_get_curr_time(&ATEND);		/* end time for the probcrit */					\
 			ATEND = sub_abs_time(&ATEND, &(ATSTART));	/* times currently use usec but might someday use ns*/	\
-			(CSA)->probecrit_rec.t_get_crit =  ((gtm_uint64_t)(ATEND.at_sec * 1000000) + ATEND.at_usec) * 1000;	\
+			(CSA)->probecrit_rec.t_get_crit =  (((gtm_uint64_t)ATEND.tv_sec * NANOSECS_IN_SEC) + ATEND.tv_nsec);	\
 			(CSA)->probecrit_rec.p_crit_failed = (gtm_uint64_t)FAILED_LOCK_ATTEMPTS;				\
 			(CSA)->probecrit_rec.p_crit_yields = (gtm_uint64_t)(YIELDS);						\
 			(CSA)->probecrit_rec.p_crit_que_slps = (gtm_uint64_t)(Q_SLPS);						\
@@ -365,7 +365,9 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 	int			timeout_intr_slpcnt;
 	long			timeout_val;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 #	ifdef DEBUG
 	if (ydb_white_box_test_case_enabled
 		&& (WBTEST_SENDTO_EPERM == ydb_white_box_test_case_number))

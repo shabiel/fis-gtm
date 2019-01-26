@@ -117,14 +117,18 @@ typedef struct
 	int		exp_length;
 	int		recall_index;			/* index corresponding to input string that was recalled when interrupted */
 	int		no_up_or_down_cursor_yet;
+	int		utf8_seen;
 	boolean_t	insert_mode;
 	ABS_TIME	end_time;
-	unsigned char	*more_ptr;
 	unsigned char	*zb_ptr;
 	unsigned char	*zb_top;
 	unsigned short	escape_length;			/* dm_read only */
 	unsigned char	escape_sequence[ESC_LEN];	/* dm_read only */
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1];
+#	ifdef DEBUG
+	boolean_t	timed;
+	int4		msec_timeout;
+#	endif
 } tt_interrupt;
 
 typedef struct

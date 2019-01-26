@@ -99,6 +99,9 @@ STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr); /* put these prototypes. These
 						   */
 STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	lks_this_cmd = 0;
 	MAXSTR_BUFF_DECL(buff);
 	MAXSTR_BUFF_INIT;
@@ -109,7 +112,9 @@ STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr)
 {
 	MAXSTR_BUFF_DECL(buff);
 	mval		zpos;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	getzposition(&zpos);
 	MAXSTR_BUFF_INIT;
 	lock_str_to_buff(pvt_ptr, buff, MAX_STRBUFF_INIT);
@@ -171,10 +176,10 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 			{
 				end_time = mv_zintcmd->mv_st_cont.mvs_zintcmd.end_or_remain;
 				remain_time = sub_abs_time(&end_time, &cur_time);	/* get remaing time to sleep */
-				if (0 <= remain_time.at_sec)
-					msec_timeout = (int4)((remain_time.at_sec * MILLISECS_IN_SEC) +
+				if (0 <= remain_time.tv_sec)
+					msec_timeout = (int4)((remain_time.tv_sec * MILLISECS_IN_SEC) +
 						/* Round up in order to prevent premature timeouts */
-						DIVIDE_ROUND_UP(remain_time.at_usec, MICROSECS_IN_MSEC));
+						DIVIDE_ROUND_UP(remain_time.tv_nsec, NANOSECS_IN_MSEC));
 				else
 					msec_timeout = 0;
 				TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last
@@ -312,9 +317,9 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 						{	/* get remain = end_time - cur_time */
 							sys_get_curr_time(&cur_time);
 							remain_time = sub_abs_time(&end_time, &cur_time);
-							msec_timeout = (int4)(remain_time.at_sec * MILLISECS_IN_SEC +
+							msec_timeout = (int4)(remain_time.tv_sec * MILLISECS_IN_SEC +
 								/* Round up in order to prevent premature timeouts */
-								DIVIDE_ROUND_UP(remain_time.at_usec, MICROSECS_IN_MSEC));
+								DIVIDE_ROUND_UP(remain_time.tv_nsec, NANOSECS_IN_MSEC));
 							if (0 >= msec_timeout)
 							{
 								out_of_time = TRUE;

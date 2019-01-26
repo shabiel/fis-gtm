@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,16 +23,19 @@
 #include "gtmsiginfo.h"
 #include "gtmimagename.h"
 #include "send_msg.h"
+#include "io.h"
 #include "gtmio.h"
 #include "have_crit.h"
 #include "deferred_exit_handler.h"
 #include "gtmmsg.h"
 #include "forced_exit_err_display.h"
+#include "libyottadb_int.h"
+#include "invocation_mode.h"
+#include "generic_signal_handler.h"
 #ifdef DEBUG
 #include "wcs_sleep.h"
 #include "wbox_test_init.h"
 #include "gt_timer.h"
-#include "io.h"
 #endif
 
 GBLREF	int4			exi_condition;
@@ -45,6 +48,8 @@ GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF  intrpt_state_t          intrpt_ok_state;
+GBLREF	boolean_t		forced_simplethreadapi_exit;
+GBLREF	struct sigaction	orig_sig_action[];
 
 LITREF	gtmImageName		gtmImageNames[];
 
@@ -57,17 +62,20 @@ error_def(ERR_KILLBYSIGUINFO);
 
 void deferred_exit_handler(void)
 {
-	void		(*signal_routine)();
-	char		*rname;
-	intrpt_state_t	prev_intrpt_state;
-
+	void			(*signal_routine)();
+	char			*rname;
+	intrpt_state_t		prev_intrpt_state;
+	int			sig;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does EXIT() etc. */
 	/* To avoid nested calls to this routine, progress the forced_exit state. */
 	SET_FORCED_EXIT_STATE_ALREADY_EXITING;
-
+	forced_simplethreadapi_exit = TRUE;	/* If SimpleThreadAPI running, signal MAIN/TP worker threads to
+						 * terminate immediately now that we are past the window where exit
+						 * had to be deferred (e.g. crit was held etc.).
+						 */
 	if (exit_handler_active)
 	{
 		assert(FALSE);	/* at this point in time (June 2003) there is no way we know of to get here, hence the assert */
@@ -105,6 +113,9 @@ void deferred_exit_handler(void)
 		call_on_signal = NULL;		/* So we don't recursively call ourselves */
 		(*signal_routine)();
 	}
+	/* If this is call-in/simpleAPI mode and a handler exists for this signal, call it */
+	sig = exi_siginfo.si_signo;
+	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("deferred_exit_handler", sig, &exi_siginfo, &exi_context, TRUE);
 	/* Note, we do not drive create_fatal_error zshow_dmp() in this routine since any deferrable signals are
 	 * by definition not fatal.
 	 */

@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,6 @@
 #include "cmd_qlf.h"
 #include "compiler.h"
 #include "error.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "lv_val.h"
 #include "mv_stent.h"
@@ -144,7 +143,6 @@ error_def(ERR_TPRETRY);
 error_def(ERR_TRIGCOMPFAIL);
 error_def(ERR_TRIGNAMEUNIQ);
 error_def(ERR_TRIGTLVLCHNG);
-error_def(ERR_CITPNESTED);
 
 /* Macro to re-initialize a symval block that was on a previously-used free chain */
 #define REINIT_SYMVAL_BLK(svb, prev)									\
@@ -277,7 +275,9 @@ STATICFNDEF int gtm_trigger_invoke(void)
 {	/* Invoke trigger M routine. Separate so error returns to gtm_trigger with proper retcode */
 	int		rc;
 	intrpt_state_t	prev_intrpt_state;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(gtm_trigger_ch, mumps_status);
 	gtm_trigger_depth++;
 	DBGTRIGR((stderr, "gtm_trigger: Dispatching trigger at depth %d\n", gtm_trigger_depth));
@@ -937,7 +937,7 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 #	ifdef DEBUG
 	for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
 	{
-		SKIP_BASE_FRAMES(fp);
+		SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 		assert(fp->rvector != rtnhdr);
 	}
 #	endif

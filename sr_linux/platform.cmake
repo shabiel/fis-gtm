@@ -3,7 +3,7 @@
 # Copyright (c) 2013-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -45,8 +45,16 @@ if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
     endif()
   endif()
 else()
-  set(arch "x86_64")
-  set(bits 64)
+  if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
+    set(bits 64)
+    set(arch "aarch64")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -march=armv8-a -mcpu=cortex-a53")
+    set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=armv8-a")
+    set(CMAKE_ASM_FLAGS_DEBUG "-Wa,-ggdb3 ${CMAKE_ASM_FLAGS_DEBUG}")
+  else()
+    set(arch "x86_64")
+    set(bits 64)
+  endif()
 endif()
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -include ${YDB_SOURCE_DIR}/sr_port/ydbmerrors.h")
 
@@ -60,8 +68,12 @@ if(${bits} EQUAL 32)
     list(APPEND gt_src_list sr_i386 sr_x86_regs sr_unix_nsb)
   endif()
 else()
-  list(APPEND gt_src_list sr_x86_64 sr_x86_regs)
-  set(gen_xfer_desc 1)
+  if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
+    list(APPEND gt_src_list sr_aarch64)
+  else()
+    list(APPEND gt_src_list sr_x86_64 sr_x86_regs)
+    set(gen_xfer_desc 1)
+  endif()
 endif()
 
 # Assembler
@@ -92,6 +104,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-
 # Note: -Wuninitialized not explicitly mentioned since it is enabled by Wall
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscripts -Wno-unused-but-set-variable")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wvla")
 
 # Below is an optimization flag related description copied from sr_linux/gtm_env_sp.csh
 #	-fno-defer-pop to prevent problems with assembly/generated code with optimization
@@ -102,13 +115,23 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscript
 # But they are no-ops in case of a dbg build when optimization is turned off so we include them in all cmake builds.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer")
 
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 	# Newer versions of Linux by default include -fstack-protector in gcc. This causes the build to slightly bloat
-	# in size. Avoid that for production builds of YottaDB.
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
-else()
-	# In Debug builds though, keep stack-protection on for ALL functions.
+	# in size and have a runtime overhead (as high as 5% extra CPU cost in our experiments). So keep that option
+	# enabled only for DEBUG builds of YottaDB.
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-all")
+else()
+	# For "Release" or "RelWithDebInfo" type of builds, keep this option disabled for performance reasons
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
+	# Enable (a) link time optimization and (b) use gold linker.
+	# (a) was seen to reduce the size of libyottadb.so by 5% and improve runtimes by 7% on a simple database test
+	# (b) gold linker was seen to slightly (~ 0.1%) improve build times and run times compared to default ld linker.
+	# Use -flto=N where N is number of available CPUs to speed up the link time.
+	include(ProcessorCount)
+	ProcessorCount(NUMCPUS)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS} -fuse-ld=gold")
+	set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
+	set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
 endif()
 
 # On ARM Linux, gcc by default does not include -funwind-tables whereas it does on x86_64 Linux.
@@ -129,35 +152,66 @@ set(gtm_dep   "${YDB_BINARY_DIR}/ydbexe_symbols.export")
 
 set(libyottadb_link "-Wl,-u,ydb_ci -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_is_main_thread")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,gtm_ci")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,gtm_cip")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_call_variadic_plist_func_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_call_variadic_plist_func_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_child_init")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_ci_t")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_cip")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_cip_t")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_data_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_data_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_delete_excl_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_delete_excl_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_delete_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_delete_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_file_id_free")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_file_id_free_t")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_file_is_identical")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_file_is_identical_t")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_file_name_to_id")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_file_name_to_id_t")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_fork_n_core")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_free")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_get_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_get_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_hiber_start")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_hiber_start_wait_any")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_incr_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_incr_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_lock_decr_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_lock_decr_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_lock_incr_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_lock_incr_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_lock_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_lock_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_malloc")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_message")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_message_t")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_node_next_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_node_next_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_node_previous_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_node_previous_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_set_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_set_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_stdout_stderr_adjust")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_stdout_stderr_adjust_t")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_str2zwr_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_str2zwr_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_subscript_next_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_subscript_next_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_subscript_previous_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_subscript_previous_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_thread_is_main")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_timer_cancel")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_timer_cancel_t")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_timer_start")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_timer_start_t")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_tp_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_tp_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_zwr2str_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_zwr2str_st")
 set(libyottadb_link "${libyottadb_link} -Wl,--version-script,\"${YDB_BINARY_DIR}/yottadb_symbols.export\"")
 set(libyottadb_dep  "${YDB_BINARY_DIR}/ydbexe_symbols.export")
 

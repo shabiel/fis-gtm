@@ -5,6 +5,8 @@
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
+ * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -28,6 +30,7 @@ LITDEF	gtcm_proto_cpu_info_t	gtcm_proto_cpu_info[] =
 	{LIT_AND_LEN("RS6000"),			"PPC"},
 	{LIT_AND_LEN("AXP"),			"AXP"},
 	{LIT_AND_LEN("HP-PA"),			"PAR"},
+	{LIT_AND_LEN("aarch64"),		"AARCH64"},
 	{LIT_AND_LEN("armv7l"),			"ARMV7L"},
 	{LIT_AND_LEN("x86"),			"X86"},
 	{LIT_AND_LEN("x86_64"),			"X86_64"},

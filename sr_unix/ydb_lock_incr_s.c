@@ -49,15 +49,15 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_LOCK_INCR);		/* Note: macro could return from this function in case of errors */
+	LIBYOTTADB_INIT(LYDB_RTN_LOCK_INCR, (int));	/* Note: macro could return from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
+	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
-		LIBYOTTADB_DONE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -82,7 +82,8 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	 * lock block space by routines called by op_lkname so are effectively already rebuffered. No need for
 	 * us to do it again.
 	 */
-	COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2, "ydb_lock_incr_s()");
+	COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2,
+							LYDBRTNNAME(LYDB_RTN_LOCK_INCR));
 	callg((callgfnptr)op_lkname, &plist);
 	/* At this point, the private lock block has been created. Remaining task before calling "op_incrlock" is to
 	 * convert the timeout value from nanoseconds to seconds

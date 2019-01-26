@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,6 @@
 #include "stringpool.h"
 #include "mlkdef.h"
 #include "zshow.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mvalconv.h"
 #include "error_trap.h"
@@ -124,7 +123,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
          * (further down the pike) is likely to load the text of the module into storage if it can. So we bypass
          * ecode setting for these two fatal errors. 02/2008 se
 	 */
-	if ((ERR_MEMORY != arg) && !IS_SIMPLEAPI_MODE)
+	if ((ERR_MEMORY != arg) && (NULL != frame_pointer) && !IS_SIMPLEAPI_MODE)
 		ecode_set(arg);
 	return (b_line);
 }

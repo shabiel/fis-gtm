@@ -36,7 +36,13 @@ set(version r123)
 
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
+endif()
+
+if("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
+  set(defined_types_tail "Debug")
+else()
+  set(defined_types_tail "Release")
 endif()
 
 # If CMAKE_BUILD_TYPE is set to Debug, then CMAKE_C_FLAGS_DEBUG variable contents will be added at the end of
@@ -617,6 +623,7 @@ set(m_files_sr_port
 file(GLOB m_files_sr_unix RELATIVE ${YDB_SOURCE_DIR}/sr_unix ${YDB_SOURCE_DIR}/sr_unix/*.m)
 file(GLOB m_files_sr_x86_64 RELATIVE ${YDB_SOURCE_DIR}/sr_x86_64 ${YDB_SOURCE_DIR}/sr_x86_64/*.m)
 file(GLOB m_files_sr_armv7l RELATIVE ${YDB_SOURCE_DIR}/sr_armv7l ${YDB_SOURCE_DIR}/sr_armv7l/*.m)
+file(GLOB m_files_sr_aarch64 RELATIVE ${YDB_SOURCE_DIR}/sr_aarch64 ${YDB_SOURCE_DIR}/sr_aarch64/*.m)
 file(GLOB m_files_sr_i386 RELATIVE ${YDB_SOURCE_DIR}/sr_i386 ${YDB_SOURCE_DIR}/sr_i386/*.m)
 file(GLOB mpt_files_sr_port RELATIVE ${YDB_SOURCE_DIR}/sr_port ${YDB_SOURCE_DIR}/sr_port/*.mpt)
 file(GLOB mpt_files_sr_unix RELATIVE ${YDB_SOURCE_DIR}/sr_unix ${YDB_SOURCE_DIR}/sr_unix/*.mpt)
@@ -842,11 +849,11 @@ Halt")
   install(FILES ${YDB_BINARY_DIR}/${help}help.dat DESTINATION ${YDB_INSTALL_DIR})
   install(FILES ${YDB_BINARY_DIR}/${help}help.gld DESTINATION ${YDB_INSTALL_DIR})
 endforeach()
-if (GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
+if (GTMDefinedTypesInit${defined_types_tail}_found)
 add_custom_command(
   OUTPUT GTMDEFINEDTYPESTODB.o
-  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${YDB_BINARY_DIR}/gtmhelp.dat_noro
-  COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${YDB_BINARY_DIR}/GTMDefinedTypesInit.m
+  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${defined_types_tail}.m ${YDB_BINARY_DIR}/gtmhelp.dat_noro
+  COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${defined_types_tail}.m ${YDB_BINARY_DIR}/GTMDefinedTypesInit.m
   COMMAND ${CMAKE_COMMAND}
     -D ydb_dist=${YDB_BINARY_DIR}
     -D ydb_routines=.
@@ -857,7 +864,7 @@ add_custom_command(
     VERBATIM
   )
 list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
-endif(GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
+endif(GTMDefinedTypesInit${defined_types_tail}_found)
 
 foreach(help gtm gde mupip dse lke)
   set(CMAKE_CONFIGURABLE_FILE_CONTENT
@@ -934,6 +941,41 @@ foreach(d COPYING README.md)
     install(FILES ${d} DESTINATION ${YDB_INSTALL_DIR})
   endif()
 endforeach()
+
+#-----------------------------------------------------------------------------
+# Strip debug symbols from files
+if("${CMAKE_BUILD_TYPE}" MATCHES "RelWithDebInfo")
+  list(APPEND executable_target_list
+    dbcertify
+    dse
+    ftok
+    gtcm_gnp_server
+    gtcm_pkdisp
+    gtcm_play
+    gtcm_server
+    gtcm_shmclean
+    gtmsecshr
+#    libgtmcrypt
+    libgtmtls
+    libyottadb
+#    libmumps
+    lke
+    maskpass
+    mumps
+    mupip
+    semstat2
+    )
+
+  foreach(e ${executable_target_list})
+    add_custom_command(TARGET ${e} POST_BUILD
+      COMMAND objcopy --only-keep-debug $<TARGET_FILE:${e}> ${e}.dbg
+      COMMAND objcopy --strip-debug $<TARGET_FILE:${e}>
+      COMMAND objcopy --add-gnu-debuglink=${e}.dbg $<TARGET_FILE:${e}>
+      WORKING_DIRECTORY "${YDB_BINARY_DIR}"
+      )
+    install(FILES "${YDB_BINARY_DIR}/${e}.dbg" DESTINATION ${YDB_INSTALL_DIR})
+  endforeach()
+endif()
 
 add_custom_target(place_files ALL DEPENDS ${files_to_place})
 add_custom_target(make_read_only ALL DEPENDS ${targets_to_run} place_files)

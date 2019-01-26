@@ -61,15 +61,15 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_DELETE);		/* Note: macro could return from this function in case of errors */
+	LIBYOTTADB_INIT(LYDB_RTN_DELETE, (int));	/* Note: macro could return from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
+	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
-		LIBYOTTADB_DONE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -104,7 +104,8 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_delete_s()");
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
+							LYDBRTNNAME(LYDB_RTN_DELETE));
 				src_lv = (lv_val *)callg((callgfnptr)op_srchindx, &plist);	/* Locate node */
 			}
 			switch(deltype)
@@ -134,7 +135,8 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_delete_s()");
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
+							LYDBRTNNAME(LYDB_RTN_DELETE));
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */

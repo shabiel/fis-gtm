@@ -24,7 +24,6 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "trigger.h"
@@ -285,7 +284,9 @@ STATICFNDEF int trigger_source_raov_tpwrap_helper(mstr *trigname, gd_region *reg
 {
 	enum cdb_sc	cdb_status;
 	int		rc;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	DBGTRIGR((stderr, "trigger_source_tpwrap_helper: Entered\n"));
 	ESTABLISH_RET(trigger_source_raov_ch, SIGNAL);
 	assert(donot_INVOKE_MUMTSTART);

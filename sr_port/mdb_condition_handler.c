@@ -21,6 +21,7 @@
 #include "gtm_stdio.h"
 #include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
 #include "gtm_signal.h"
+#include "gtm_pthread.h"
 #include <stdarg.h>
 
 #include "ast.h"
@@ -42,7 +43,6 @@
 #include "io_params.h"
 #include "jnl.h"
 #include "lv_val.h"
-#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "outofband.h"
 #include "stack_frame.h"
@@ -90,6 +90,8 @@
 #include "libyottadb.h"
 #include "setup_error.h"
 #include "iottdef.h"
+#include "trace_table.h"
+#include "caller_id.h"
 
 GBLREF	boolean_t		created_core, dont_want_core, in_gvcst_incr, run_time;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */

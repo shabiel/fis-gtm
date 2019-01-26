@@ -37,6 +37,7 @@ GDEINIT
 	s endian("S390","OS390")=TRUE,endian("S390X","Linux")=TRUE,glo("OS390")=1024
 	s endian("armv6l","Linux")=FALSE,glo("Linux")=1024
 	s endian("armv7l","Linux")=FALSE,glo("Linux")=1024
+	s endian("aarch64","Linux")=FALSE,glo("Linux")=1024
 	; The following line is for support of AIX V3.2.5 only and can (and should)
 	; be removed (along with this comment) as soon as we drop support for
 	; AIX V3.2.5.  This change is needed to correspond to the change in
@@ -44,7 +45,7 @@ GDEINIT
 	s glo("AIX325")=glo("AIX")
 	s HEX(0)=1
 	s gtm64=$p($zver," ",4)
-	i "/IA64/RS6000/SPARC/x86_64/x86/S390/S390X"[("/"_gtm64) s encsupportedplat=TRUE,gtm64=$s("x86"=gtm64:FALSE,1:TRUE)
+	i "/IA64/RS6000/SPARC/x86_64/x86/S390/S390X/aarch64"[("/"_gtm64) s encsupportedplat=TRUE,gtm64=$s("x86"=gtm64:FALSE,1:TRUE)
 	e  s (encsupportedplat,gtm64)=FALSE
 	i (gtm64=TRUE) d
 	. f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
@@ -139,14 +140,16 @@ GDEINIT
 	s tokens(")")="TKRPAREN",tokens("TKRPAREN")="right parenthesis"
 	s tokens("!")="TKEXCLAM",tokens("TKEXCLAM")="exclamation point"
 	s tokens("-")="TKDASH",tokens("TKDASH")="dash"
-	s tokens("")="TKEOL"	; for parsing purposes
+	; Check gdequiet to determine if null tokens should be added. gdequiet indicates that parsing of tokens
+	; isn't going to be performed as it is non-interactive
+	s:'$g(gdequiet) tokens("")="TKEOL"	; for parsing purposes
 ; tokendelim is used for parsing; it is defined for all characters that can terminate a valid token during parsing
-	for c=" ",TAB,"=",",",")","" s tokendelim(c)=""
+	i '$g(gdequiet) for c=" ",TAB,"=",",",")","" s tokendelim(c)=""
 	; In the Unix shell command line, space is by default the separator for multiple qualifiers.
 	; GDE handles separators similarly.
 ; spacedelim is used for parsing when we want to terminate token parsing only if we see a white space (a subset of "tokendelim")
 ; this is needed in case we are parsing say a filename and we don't want a "-" or "=" in the file name to terminate the parse.
-	for c=" ",TAB,"" s spacedelim(c)=""
+	i '$g(gdequiet) for c=" ",TAB,"" s spacedelim(c)=""
 	k c
 ; maximums and mimimums
 ; gblname
@@ -169,7 +172,7 @@ GDEINIT
 	s minreg("EPOCHTAPER")=0
 	s minreg("AUTODB")=0
 	s minreg("STATS")=0
-	s minreg("LOCK_CRIT")=0
+	s minreg("LOCK_CRIT_SEPARATE")=0
 	s minreg("RECORD_SIZE")=0
 	s minreg("JOURNAL")=0,minreg("KEY_SIZE")=3,minreg("NULL_SUBSCRIPTS")=0
 	s maxreg("ALLOCATION")=TWO(24),maxreg("BEFORE_IMAGE")=1
@@ -186,7 +189,7 @@ GDEINIT
 	s maxreg("EPOCHTAPER")=1
 	s maxreg("AUTODB")=1
 	s maxreg("STATS")=1
-	s maxreg("LOCK_CRIT")=1
+	s maxreg("LOCK_CRIT_SEPARATE")=1
 	s maxreg("KEY_SIZE")=1019	; = max value of KEY->end that returns TRUE for CAN_APPEND_HIDDEN_SUBS(KEY) in gdsfhead.h
 	s maxreg("JOURNAL")=1,maxreg("NULL_SUBSCRIPTS")=2
 	s maxreg("RECORD_SIZE")=SIZEOF("max_str")
@@ -260,7 +263,7 @@ syntabi:
 	s syntab("ADD","REGION","EPOCHTAPER")="NEGATABLE"
 	s syntab("ADD","REGION","AUTODB")="NEGATABLE"
 	s syntab("ADD","REGION","STATS")="NEGATABLE"
-	s syntab("ADD","REGION","LOCK_CRIT")="NEGATABLE"
+	s syntab("ADD","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
 	s syntab("ADD","REGION","INST_FREEZE_ON_ERROR")="NEGATABLE"
 	s syntab("ADD","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("ADD","REGION","JOURNAL","ALLOCATION")="REQUIRED"
@@ -326,7 +329,7 @@ syntabi:
 	s syntab("CHANGE","REGION","EPOCHTAPER")="NEGATABLE"
 	s syntab("CHANGE","REGION","AUTODB")="NEGATABLE"
 	s syntab("CHANGE","REGION","STATS")="NEGATABLE"
-	s syntab("CHANGE","REGION","LOCK_CRIT")="NEGATABLE"
+	s syntab("CHANGE","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
 	s syntab("CHANGE","REGION","INST_FREEZE_ON_ERROR")="NEGATABLE"
 	s syntab("CHANGE","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("CHANGE","REGION","JOURNAL","ALLOCATION")="REQUIRED"
@@ -392,7 +395,7 @@ syntabi:
 	s syntab("TEMPLATE","REGION","EPOCHTAPER")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","AUTODB")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","STATS")="NEGATABLE"
-	s syntab("TEMPLATE","REGION","LOCK_CRIT")="NEGATABLE"
+	s syntab("TEMPLATE","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","JOURNAL","EXTENSION")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","EXTENSION","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","JOURNAL","FILE_NAME")="REQUIRED"

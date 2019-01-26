@@ -18,9 +18,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <errno.h>
-#ifdef USE_POLL
 # include <sys/poll.h>
-#endif
 
 #include "gtm_stdio.h"
 #include "gtm_string.h"
@@ -30,7 +28,6 @@
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
-#include "gtm_select.h"
 #include "gtm_time.h"
 #include "eintr_wrappers.h"
 
@@ -67,11 +64,11 @@
  * # calls to repl_send with unaligned buffer
  * # bytes repl_send called with, distribute into buckets
  * % of input bytes repl_send actually sent, or # bytes actually sent distributed into buckets
- * # calls to select, and timeout distributed into buckets
+ * # calls to poll, and timeout distributed into buckets
  * # calls to send
- * # calls to select that were interrupted (EINTR)
- * # calls to select that were unsuccessful due to system resource shortage (EAGAIN)
- * # calls to select that timed out
+ * # calls to poll that were interrupted (EINTR)
+ * # calls to poll that were unsuccessful due to system resource shortage (EAGAIN)
+ * # calls to poll that timed out
  * # calls to send that were interrupted (EINTR)
  * # calls to send that failed due to the message size being too big (EMSGSIZE)
  * # calls to send that would have blocked (EWOULDBLOCK)
@@ -81,11 +78,11 @@
  * # calls to repl_recv with unaligned buffer
  * # bytes repl_recv called with, distribute into buckets
  * % of input length repl_recv actually received, or # bytes actuall received distributed into buckets
- * # calls to select, and timeout distributed into buckets
+ * # calls to poll, and timeout distributed into buckets
  * # calls to recv
- * # calls to select that were interrupted (EINTR)
- * # calls to select that were unsuccessful due to system resource shortage (EAGAIN)
- * # calls to select that timed out
+ * # calls to poll that were interrupted (EINTR)
+ * # calls to poll that were unsuccessful due to system resource shortage (EAGAIN)
+ * # calls to poll that timed out
  * # calls to recv that were interrupted (EINTR)
  * # calls to recv that failed due to the connection reset (bytes received == 0)
  * # calls to recv that would have blocked (EWOULDBLOCK)
@@ -147,31 +144,13 @@ error_def(ERR_TLSCONNINFO);
 int fd_ioready(int sock_fd, int poll_direction, int timeout)
 {
 	int		save_errno, status, EAGAIN_cnt = 0;
-#	ifdef USE_POLL
 	struct pollfd	fds;
-#	else
-	fd_set		fds, *readfds, *writefds;
-	struct timeval	timeout_spec;
-#	endif
 
 	assert(timeout < MILLISECS_IN_SEC);
-	SELECT_ONLY(timeout = timeout * 1000);		/* Convert to microseconds (~ 1sec) */
-	assert((timeout >= 0) && (timeout < POLL_ONLY(MILLISECS_IN_SEC) SELECT_ONLY(MICROSECS_IN_SEC)));
-#	ifdef USE_POLL
+	assert((timeout >= 0) && (timeout < MILLISECS_IN_SEC));
 	fds.fd = sock_fd;
 	fds.events = (REPL_POLLIN == poll_direction) ? POLLIN : POLLOUT;
-#	else
-	readfds = writefds = NULL;
-	timeout_spec.tv_sec = 0;
-	timeout_spec.tv_usec = timeout;
-	assertpro(FD_SETSIZE > sock_fd);
-	FD_ZERO(&fds);
-	FD_SET(sock_fd, &fds);
-	writefds = (REPL_POLLOUT == poll_direction) ? &fds : NULL;
-	readfds = (REPL_POLLIN == poll_direction) ? &fds : NULL;
-#	endif
-	POLL_ONLY(while (-1 == (status = poll(&fds, 1, timeout))))
-	SELECT_ONLY(while (-1 == (status = select(sock_fd + 1, readfds, writefds, NULL, &timeout_spec))))
+	while (-1 == (status = poll(&fds, 1, timeout)))
 	{
 		save_errno = ERRNO;
 		if (EINTR == save_errno)
@@ -184,17 +163,11 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 			if (0 == ++EAGAIN_cnt % REPL_COMM_LOG_EAGAIN_INTERVAL)
 			{
 				repl_log(stderr, TRUE, TRUE, "Communication subsytem warning: System appears to be resource "
-						"starved. EAGAIN returned from select()/poll() %d times\n", EAGAIN_cnt);
+						"starved. EAGAIN returned from poll() %d times\n", EAGAIN_cnt);
 			}
 			rel_quant();	/* this seems legit */
 		} else
 			return -1;
-		/* Just in case select() modifies the incoming arguments, restore fd_set and timeout_spec */
-		SELECT_ONLY(
-			assert(0 == timeout_spec.tv_sec);
-			timeout_spec.tv_usec = timeout;	/* Note: timeout is the reduced value (in case of EINTR) */
-			FD_SET(sock_fd, &fds);
-		)
 	}
 	return status;
 }
@@ -265,11 +238,11 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 			/* handle error */
 			save_errno = repl_tls.enabled ? gtm_tls_errno() : ERRNO;
 			if (-1 == save_errno)
-			{	/* This indicates an error from TLS/SSL layer and not from a system call. */
+			{	/* This indicates an error from TLS/SSL layer and not from a system call.
+				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
+				 */
 				assert(repl_tls.enabled);
-				assert(FALSE);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2,
-						LEN_AND_STR(gtm_tls_get_error()));
+				save_errno = ERR_TLSIOERROR;
 			}
 #			else
 			save_errno = ERRNO;
@@ -374,11 +347,12 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 			/* handle error */
 			save_errno = repl_tls.enabled ? gtm_tls_errno() : ERRNO;
 			if (-1 == save_errno)
-			{
+			{	/* This indicates an error from TLS/SSL layer and not from a system call.
+				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
+				 */
 				assert(repl_tls.enabled);
-				assert(FALSE);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("recv"), ERR_TEXT, 2,
-						LEN_AND_STR(gtm_tls_get_error()));
+				save_errno = ERR_TLSIOERROR;
+				bytes_recvd = -1;	/* to ensure "save_errno" does not get overwritten a few lines later */
 			}
 #			else
 			save_errno = ERRNO;

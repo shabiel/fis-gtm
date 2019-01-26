@@ -22,7 +22,6 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsfhead.h"
-#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "error.h"
@@ -82,7 +81,7 @@ GBLREF	uint4			t_err;
 GBLREF	int			tprestart_state;
 GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
-GBLREF	pid_t			process_id;
+GBLREF	uint4			process_id;
 GBLREF	trans_num		local_tn;
 #ifdef DEBUG
 GBLREF	uint4			dollar_trestart;
@@ -348,7 +347,9 @@ STATICFNDEF void gvtr_db_tpwrap_helper(sgmnt_addrs *csa, int err_code, boolean_t
 #	ifdef DEBUG
 	gv_namehead		*save_gv_target;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(gvtr_tpwrap_ch);
 	assert(dollar_tlevel);
 	assert(gv_target != csa->hasht_tree);

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -37,7 +40,6 @@
 #include "str2gvkey.h"
 #include "gtmmsg.h"
 #include "gtm_utf8.h"
-#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "mu_interactive.h"
 #include "wbox_test_init.h"
@@ -163,9 +165,6 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	mname_entry	gvname;
 
 	gvinit();
-	reg_list = (gd_region **) malloc(gd_header->n_regions * SIZEOF(gd_region *));
-	for (index = 0; index < gd_header->n_regions; index++)
-		reg_list[index] = NULL;
 	if ((MU_FMT_GO != fmt) && (MU_FMT_ZWR != fmt))
 	{
 		assert((MU_FMT_GO == fmt) || (MU_FMT_ZWR == fmt));
@@ -175,7 +174,6 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 		begin = 3;
 	ptr = line3_ptr;
 	len = line3_len;
-	failed_record_count = 0;
 	go_format_val_read = FALSE;
 	for (iter = 3; iter < begin; iter++)
 	{
@@ -195,6 +193,11 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	des.len = key_count = max_data_len = max_subsc_len = 0;
 	des.addr = (char *)rec_buff;
 	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, 4294967196U); /* (2**32)-100=4294967196 */
+	reg_list = (gd_region **) malloc(gd_header->n_regions * SIZEOF(gd_region *));
+	for (index = 0; index < gd_header->n_regions; index++)
+		reg_list[index] = NULL;
+	failed_record_count = 0;
+	first_failed_rec_count = 0;
 	for (iter = begin - 1; ;)
 	{
 		if (++iter > end)
@@ -207,7 +210,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 		{
 			util_out_print("!AD:!_  Key cnt: !@UQ  max subsc len: !UL  max data len: !UL", TRUE,
 				       LEN_AND_LIT("LOAD TOTAL"), &key_count, max_subsc_len, max_data_len);
-			tmp_rec_count = (iter == begin) ? iter : iter - 1;
+			tmp_rec_count = iter - 1;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_INFO(ERR_LOADRECCNT), 1, &tmp_rec_count);
 			mu_gvis();
 			util_out_print(0, TRUE);
@@ -267,7 +270,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 					insert_reg_to_list(reg_list, db_init_region, &num_of_reg);
 					first_failed_rec_count = iter;
 					mu_load_error = TRUE;
-				}else
+				} else
 				{
 					first_failed_rec_count = 0;
 					mu_gvis();
@@ -394,6 +397,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 		key_count++;
 	}
 	file_input_close();
+	free(reg_list);
 	if (mu_ctrly_occurred)
 	{
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_LOADCTRLY);
@@ -402,10 +406,9 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	if (mupip_error_occurred && ONERROR_STOP == onerror)
 	{
 		tmp_rec_count = (go_format_val_read) ? iter - 1 : iter;
-		failed_record_count-=(go_format_val_read) ? 1 : 0;
-	}
-	else
-		tmp_rec_count = (iter == begin) ? iter : iter - 1;
+		failed_record_count -= (go_format_val_read) ? 1 : 0;
+	} else
+		tmp_rec_count = iter - 1;
 	if (0 != first_failed_rec_count)
 	{
 		if (tmp_rec_count > first_failed_rec_count)
@@ -430,6 +433,9 @@ void go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1)
 	 * and continue in go_load after they occur, it is necessary to call these routines from a
 	 * subroutine due to the limitations of condition handlers and unwinding on UNIX.
 	 */
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(mupip_load_ch);
 	switch(routine)
 	{	case GO_PUT_SUB:
@@ -451,7 +457,9 @@ int go_get(char **in_ptr, int max_len, uint4 max_rec_size)
 {
 	int			rd_len, ret_len;
 	mval			val;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(mupip_load_ch, 0);
 	/* one-time only reads if in TP to avoid TPNOTACID, otherwise use untimed reads */
 	for (ret_len = 0; ; )

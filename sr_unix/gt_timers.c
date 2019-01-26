@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -57,20 +57,15 @@
 #include <errno.h>
 #include <stddef.h>
 #include <stdarg.h>
+#ifdef YDB_USE_POSIX_TIMERS
+#include <sys/syscall.h>	/* for "syscall" */
+#endif
 
-#if (defined(__ia64) && defined(__linux__)) || defined(__MVS__)
-# include "gtm_unistd.h"
-#endif /* __ia64 && __linux__ or __MVS__ */
 #include "gt_timer.h"
 #include "wake_alarm.h"
+#include "io.h"
 #ifdef DEBUG
 # include "wbox_test_init.h"
-# include "io.h"
-#endif
-#if	defined(mips) && !defined(_SYSTYPE_SVR4)
-# include <bsd/sys/time.h>
-#else
-# include <sys/time.h>
 #endif
 #ifndef __MVS__
 # include <sys/param.h>
@@ -83,6 +78,10 @@
 #include "error.h"
 #include "gtm_multi_thread.h"
 #include "gtmxc_types.h"
+#include "getjobnum.h"
+#include "generic_signal_handler.h"
+#include "libyottadb_int.h"
+#include "invocation_mode.h"
 
 #ifdef ITIMER_REAL
 # define BSD_TIMER
@@ -107,43 +106,43 @@ int4	time();
 	safe_handlers[safe_handlers_cnt++] = HNDLR;						\
 }
 
-#ifdef BSD_TIMER
-#  define REPORT_SETITIMER_ERROR(TIMER_TYPE, SYS_TIMER, FATAL, ERRNO)				\
-{												\
-	char s[512];										\
-												\
-	SNPRINTF(s, 512, "Timer: %s; timer_active: %d; "					\
-		"sys_timer.it_value: [tv_sec: %ld; tv_usec: %ld]; "				\
-		"sys_timer.it_interval: [tv_sec: %ld; tv_usec: %ld]",				\
-		TIMER_TYPE, timer_active,							\
-		SYS_TIMER.it_value.tv_sec, SYS_TIMER.it_value.tv_usec,				\
-		SYS_TIMER.it_interval.tv_sec, SYS_TIMER.it_interval.tv_usec);			\
-	if (FATAL)										\
-	{											\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)						\
-			ERR_SETITIMERFAILED, 1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));		\
-		in_setitimer_error = TRUE;							\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SETITIMERFAILED, 1, ERRNO);	\
-	} else											\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)	MAKE_MSG_WARNING(ERR_SETITIMERFAILED),	\
-			1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));					\
-}
+#ifndef BSD_TIMER
+#  error Platform does not support BSD_TIMER which this module relies on
+#endif
 
-#define SYS_SETTIMER(TIMER, DELTA)								\
-MBSTART {											\
-	sys_timer_at = (TIMER)->expir_time;							\
-	sys_settimer((TIMER)->tid, DELTA);							\
-} MBEND
-
-STATICDEF struct itimerval	sys_timer, old_sys_timer;
-STATICDEF ABS_TIME		sys_timer_at;			/* Absolute time associated with sys_timer */
-STATICDEF boolean_t		in_setitimer_error;
+#ifdef YDB_USE_POSIX_TIMERS
+	STATICDEF struct itimerspec	sys_timer, old_sys_timer;
+	STATICDEF ABS_TIME		sys_timer_at;			/* Absolute time associated with sys_timer */
+#else
+#	define REPORT_SETITIMER_ERROR(TIMER_TYPE, SYS_TIMER, FATAL, ERRNO)				\
+	MBSTART {											\
+		char s[512];										\
+													\
+		SNPRINTF(s, 512, "Timer: %s; timer_active: %d; "					\
+			"sys_timer.it_value: [tv_sec: %ld; tv_usec: %ld]; "				\
+			"sys_timer.it_interval: [tv_sec: %ld; tv_usec: %ld]",				\
+			TIMER_TYPE, timer_active,							\
+			SYS_TIMER.it_value.tv_sec, SYS_TIMER.it_value.tv_usec,				\
+			SYS_TIMER.it_interval.tv_sec, SYS_TIMER.it_interval.tv_usec);			\
+		if (FATAL)										\
+		{											\
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)						\
+				ERR_SETITIMERFAILED, 1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));		\
+			in_setitimer_error = TRUE;							\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SETITIMERFAILED, 1, ERRNO);	\
+		} else											\
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)	MAKE_MSG_WARNING(ERR_SETITIMERFAILED),	\
+				1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));					\
+	} MBEND
+	STATICDEF struct itimerval	sys_timer, old_sys_timer;
+	STATICDEF ABS_TIME		sys_timer_at;			/* Absolute time associated with sys_timer */
+	STATICDEF boolean_t		in_setitimer_error;
 #endif
 
 #define DUMMY_SIG_NUM		0		/* following can be used to see why timer_handler was called */
 #define SAFE_FOR_ANY_TIMER	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (FALSE == process_exiting) && !fast_lock_count)
-/* In case threads are running, we dont want any unsafe timers to be handled during a timer handler pop. This is because we
- * dont know if the threads will modify the same global variable that the unsafe timer modifies concurrently.
+/* In case threads are running, we don't want any unsafe timers to be handled during a timer handler pop. This is because we
+ * don't know if the threads will modify the same global variable that the unsafe timer modifies concurrently.
  * But it is okay for timers to be started by individual threads. For example the iott_flush_timer will be started inside
  * thread code only while holding a mutex lock (e.g. inside gtm_putmsg_list or so) and even though a "setitimer" call is done
  * inside one thread, the SIGALRM pop will happen only in the parent process because all threads have SIGALRM disabled in their
@@ -170,6 +169,10 @@ STATICDEF int		safe_handlers_cnt;
 
 STATICDEF boolean_t	stolen_timer = FALSE;	/* only complain once, used in check_for_timer_pops() */
 STATICDEF char 		*whenstolen[] = {"check_for_timer_pops", "check_for_timer_pops first time"}; /* for check_for_timer_pops */
+
+#ifdef YDB_USE_POSIX_TIMERS
+STATICDEF timer_t	posix_timer_id;
+#endif
 
 #ifdef DEBUG
 STATICDEF int		trc_timerpop_idx;
@@ -203,9 +206,15 @@ GBLREF	void		(*jnl_file_close_timer_ptr)(void);	/* Initialized only in gtm_start
 GBLREF	int4		error_condition;
 GBLREF	int4		outofband;
 GBLREF	int		process_exiting;
+GBLREF	struct sigaction orig_sig_action[];
+#ifdef YDB_USE_POSIX_TIMERS
+GBLREF	pid_t		posix_timer_thread_id;
+GBLREF	boolean_t	posix_timer_created;
+#endif
 #ifdef DEBUG
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
 GBLREF	boolean_t	gtm_jvm_process;
+GBLREF	boolean_t	exit_handler_active;
 #endif
 
 error_def(ERR_SETITIMERFAILED);
@@ -307,20 +316,12 @@ void prealloc_gt_timers(void)
  */
 void sys_get_curr_time(ABS_TIME *atp)
 {
-#	ifdef BSD_TIMER
-	struct timeval	tv;
-	struct timespec	elp_time;
-
 	/* Note: This function is called from timer_handler and so needs to be async-signal safe.
-	 * POSIX defines "clock_gettime" as safe but not "gettimeofday" so dont use the latter.
+	 *       POSIX defines "clock_gettime" as safe but not "gettimeofday" so don't use the latter.
+	 * Note: CLOCK_MONOTONIC comes more recommended than CLOCK_REALTIME since it is immune to adjustments
+	 *       from NTP and adjtime(). So we use that.
 	 */
-	clock_gettime(CLOCK_REALTIME, &elp_time);
-	atp->at_sec = (int4)elp_time.tv_sec;
-	atp->at_usec = (int4)elp_time.tv_nsec / 1000;
-#	else
-	atp->at_sec = time((int4 *) 0);
-	atp->at_usec = 0;
-#	endif
+	clock_gettime(CLOCK_MONOTONIC, atp);
 }
 
 /* Start hibernating by starting a timer and waiting for it. */
@@ -498,9 +499,9 @@ STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(),
 	DUMP_TIMER_INFO("After invoking add_timer()");
 	if ((timeroot->tid == tid) || !timer_active
 			|| (timer_active
-				&& ((newt->expir_time.at_sec < sys_timer_at.at_sec)
-					|| ((newt->expir_time.at_sec == sys_timer_at.at_sec)
-						&& ((gtm_tv_usec_t)newt->expir_time.at_usec < sys_timer_at.at_usec)))))
+				&& ((newt->expir_time.tv_sec < sys_timer_at.tv_sec)
+					|| ((newt->expir_time.tv_sec == sys_timer_at.tv_sec)
+						&& (newt->expir_time.tv_nsec < sys_timer_at.tv_nsec)))))
 		start_first_timer(&at);
 }
 
@@ -571,22 +572,71 @@ void clear_timers(void)
  */
 STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 {
-#	ifdef BSD_TIMER
+	struct sigevent	sevp;
+	int		save_errno;
+
+#	ifdef YDB_USE_POSIX_TIMERS
+	if (!posix_timer_created)
+	{	/* No posix timer has yet been created */
+		sevp.sigev_notify = SIGEV_THREAD_ID;
+		if (0 == posix_timer_thread_id)
+			posix_timer_thread_id = syscall(SYS_gettid);
+		/* Note: The man pages of "timer_create" indicate we need to fill "sevp.sigev_notify_thread_id" with the thread id
+		 * but that field does not seem to be defined at least in all linux versions we currently have with the current
+		 * compilation flags we use so we define it explicitly to "sevp._sigev_un._tid" which then works as desired.
+		 */
+#		ifndef sigev_notify_thread_id
+#		define sigev_notify_thread_id _sigev_un._tid
+#		endif
+		sevp.sigev_notify_thread_id = posix_timer_thread_id;
+		sevp.sigev_signo = SIGALRM;
+		if (timer_create(CLOCK_MONOTONIC, &sevp, &posix_timer_id))
+		{
+			save_errno = errno;
+			assert(FALSE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7)
+					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_create()"), CALLFROM, save_errno);
+		}
+		posix_timer_created = TRUE;
+	}
+	assert(0 <= time_to_expir->tv_sec);
+	assert(0 <= time_to_expir->tv_nsec);
+	assert(NANOSECS_IN_SEC > time_to_expir->tv_nsec);
+	sys_timer.it_value.tv_sec = time_to_expir->tv_sec;
+	sys_timer.it_value.tv_nsec = time_to_expir->tv_nsec;
+	assert(sys_timer.it_value.tv_sec || sys_timer.it_value.tv_nsec);
+	sys_timer.it_interval.tv_sec = sys_timer.it_interval.tv_nsec = 0;
+	if ((-1 == timer_settime(posix_timer_id, 0, &sys_timer, &old_sys_timer)) || WBTEST_ENABLED(WBTEST_SETITIMER_ERROR))
+	{
+		save_errno = errno;
+		assert(WBTEST_ENABLED(WBTEST_SETITIMER_ERROR));
+		WBTEST_ONLY(WBTEST_SETITIMER_ERROR,
+			save_errno = EINVAL;
+		);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
+					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_settime()"), CALLFROM, save_errno);
+	}
+#	else
 	if (in_setitimer_error)
 		return;
-	sys_timer.it_value.tv_sec = time_to_expir->at_sec;
-	sys_timer.it_value.tv_usec = (gtm_tv_usec_t)time_to_expir->at_usec;
+	sys_timer.it_value.tv_sec = time_to_expir->tv_sec;
+	sys_timer.it_value.tv_usec = (gtm_tv_usec_t)(time_to_expir->tv_nsec / NANOSECS_IN_USEC);
+	assert(MICROSECS_IN_SEC > sys_timer.it_value.tv_usec);
+	if (!sys_timer.it_value.tv_sec && !sys_timer.it_value.tv_usec)
+	{	/* Case where the requested time_to_expir is < 1000 nanoseconds i.e. == 0 microsecond.
+		 * We cannot pass 0 microseconds to "setitimer" as it will cause the system interval timer to stop.
+		 * And we cannot treat the time_to_expir as 0 (i.e. treat the timer event as already expired) either
+		 * as that would mean premature return (relative to the requested time) even if it is premature
+		 * by < 1000 nanoseconds. Therefore treat this case as == 1000 nanoseconds (1 microsecond) as that
+		 * is the minimum resolution of the "setitimer" call.
+		 */
+		sys_timer.it_value.tv_usec = 1;
+	}
 	sys_timer.it_interval.tv_sec = sys_timer.it_interval.tv_usec = 0;
-	assert(1000000 > sys_timer.it_value.tv_usec);
 	if ((-1 == setitimer(ITIMER_REAL, &sys_timer, &old_sys_timer)) || WBTEST_ENABLED(WBTEST_SETITIMER_ERROR))
 	{
 		REPORT_SETITIMER_ERROR("ITIMER_REAL", sys_timer, TRUE, errno);
 	}
-#	else
-	if (time_to_expir->at_sec == 0)
-		alarm((unsigned)1);
-	else
-		alarm(time_to_expir->at_sec);
 #	endif
 	timer_active = TRUE;
 }
@@ -596,7 +646,7 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
  */
 STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 {
-	ABS_TIME	eltime;
+	ABS_TIME	deltatime;
 	GT_TIMER	*tpop;
 	DCL_THREADGBL_ACCESS;
 
@@ -607,13 +657,13 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 		return;
 	for (tpop = (GT_TIMER *)timeroot ; tpop ; tpop = tpop->next)
 	{
-		eltime = sub_abs_time((ABS_TIME *)&tpop->expir_time, curr_time);
-		if ((0 > eltime.at_sec) || ((0 == eltime.at_sec) && (0 == eltime.at_usec)))
+		deltatime = sub_abs_time((ABS_TIME *)&tpop->expir_time, curr_time);
+		if ((0 > deltatime.tv_sec) || ((0 == deltatime.tv_sec) && (0 == deltatime.tv_nsec)))
 		{	/* Timer has expired. Handle safe timers, defer unsafe timers. */
 			if (tpop->safe || (SAFE_FOR_TIMER_START && (1 > timer_stack_count)
 						&& !(TREF(in_ext_call) && (wcs_stale_fptr == tpop->handler))))
 			{
-				timer_handler(DUMMY_SIG_NUM);
+				timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 				/* At this point all timers should have been handled, including a recursive call to
 				 * start_first_timer(), if needed, and SET_DEFERRED_TIMERS_CHECK_NEEDED invoked if
 				 * appropriate, so we are done.
@@ -626,7 +676,8 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 			}
 		} else
 		{	/* Set system timer to wake on unexpired timer. */
-			SYS_SETTIMER(tpop, &eltime);
+			sys_timer_at = tpop->expir_time;
+			sys_settimer(tpop->tid, &deltatime);
 			break;	/* System timer will handle subsequent timers, so we are done. */
 		}
 		assert(GET_DEFERRED_TIMERS_CHECK_NEEDED);
@@ -637,11 +688,11 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 
 /* Timer handler. This is the main handler routine that is being called by the kernel upon receipt
  * of timer signal. It dispatches to the user handler routine, and removes first timer in a timer
- * queue. If the queue is not empty, it starts the first timer in the queue. The why parameter is a
- * no-op in our case, but is required to maintain compatibility with the system type of __sighandler_t,
- * which is (void*)(int).
+ * queue. If the queue is not empty, it starts the first timer in the queue.
+ * The "why" parameter can be DUMMY_SIG_NUM (if the handler is being invoked internally from YottaDB code)
+ * or SIGALRM (if the handler is being invoked by the kernel upon receipt of the SIGALRM signal).
  */
-STATICFNDEF void timer_handler(int why)
+STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 {
 	int4		cmp, save_error_condition;
 	GT_TIMER	*tpop, *tpop_prev = NULL;
@@ -660,14 +711,23 @@ STATICFNDEF void timer_handler(int why)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(gtm_is_main_thread() || gtm_jvm_process);
-	DUMP_TIMER_INFO("At the start of timer_handler()");
+	assert((DUMMY_SIG_NUM == why) || (SIGALRM == why));
 	if (SIGALRM == why)
-	{	/* If why is 0, we know that timer_handler() was called directly, so no need
-		 * to check if the signal needs to be forwarded to appropriate thread.
+	{	/* Note that when using POSIX timers, the signal is already being sent to the
+		 * correct thread for timer pops so one might think there is no need to "forward it".
+		 * But it is possible a C program holding a parent M-lock with SimpleAPI can fork off processes
+		 * that start waiting for a child M-lock with SimpleThreadAPI in which case the lock wake up signal
+		 * (a SIGALRM signal) from the parent program would get sent to the child process-id (using "crit_wake")
+		 * which should forward the signal to the MAIN worker thread as that is the one driving the YottaDB engine.
+		 * Therefore we need this signal forwarding even in the POSIX timer case.
 		 */
-		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM);
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM, IS_EXI_SIGNAL_FALSE, NULL, NULL);
 	}
+	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
+	 * to check if the signal needs to be forwarded to appropriate thread.
+	 */
+	assert(gtm_is_main_thread() || gtm_jvm_process || exit_handler_active && (DUMMY_SIG_NUM == why));
+	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler
 	 * (say to handle sig-3) and then had a timer handler pop while inside there (possible for example in receiver server).
@@ -686,6 +746,12 @@ STATICFNDEF void timer_handler(int why)
 	{
 		SET_DEFERRED_TIMERS_CHECK_NEEDED;
 		INTERLOCK_ADD(&timer_stack_count, UNUSED, -1);
+#		ifdef SIGNAL_PASSTHRU
+		if (SIGALRM == why)
+		{	/* Only drive this handler if we have an actual signal - not a dummy call */
+			DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("timer_handler", why, info, context, FALSE);
+		}
+#		endif
 		return;
 	}
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
@@ -707,9 +773,11 @@ STATICFNDEF void timer_handler(int why)
 #	ifdef DEBUG
 	if (safe_for_timer_pop)
 		in_nondeferrable_signal_handler = IN_TIMER_HANDLER;
-	/* Allow a base 50 seconds of lateness for safe timers */
-	late_time.at_sec = 50;
-	late_time.at_usec = 0;
+	/* Allow a base 100 seconds of lateness for safe timers. Note that this used to be 50 seconds before but in loaded
+	 * systems we have seen the timer pop getting delayed by as much as 75 seconds. So bumped it to 100 seconds instead.
+	 */
+	late_time.tv_sec = 100;
+	late_time.tv_nsec = 0;
 #	endif
 	while (tpop)					/* fire all handlers that expired */
 	{
@@ -771,12 +839,12 @@ STATICFNDEF void timer_handler(int why)
 					 * Otherwise, a hung unsafe timer could cause a subsequent safe timer to be overdue.
 					 */
 					rel_time = sub_abs_time(&at, &old_at);
-					late_time.at_sec += rel_time.at_sec;
-					late_time.at_usec += rel_time.at_usec;
-					if (late_time.at_usec > MICROSECS_IN_SEC)
+					late_time.tv_sec += rel_time.tv_sec;
+					late_time.tv_nsec += rel_time.tv_nsec;
+					if (late_time.tv_nsec > NANOSECS_IN_SEC)
 					{
-						late_time.at_sec++;
-						late_time.at_usec -= MICROSECS_IN_SEC;
+						late_time.tv_sec++;
+						late_time.tv_nsec -= NANOSECS_IN_SEC;
 					}
 #					endif
 				}
@@ -853,6 +921,14 @@ STATICFNDEF void timer_handler(int why)
 #	ifdef DEBUG
 	if (safe_for_timer_pop)
 		in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler;
+#	endif
+#	ifdef SIGNAL_PASSTHRU
+	/* If this is call-in/simpleAPI mode and a handler exists for this signal, call it */
+	if ((SIGALRM == why) && (MUMPS_CALLIN & invocation_mode) && IS_SIMPLEAPI_MODE
+	    && (SIG_DFL != orig_sig_action[why].sa_handler) && (SIG_IGN != orig_sig_action[why].sa_handler))
+	{
+		DRIVE_SIGNAL_HANDLER_FROM_MAIN("timer_handler2", why, info, context, orig_sig_action[why].sa_handler);
+	}
 #	endif
 	DUMP_TIMER_INFO("At the end of timer_handler()");
 }
@@ -946,8 +1022,8 @@ STATICFNDEF GT_TIMER *add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void
 	if (0 < hdata_len)
 		memcpy(ntp->hd_data, hdata, hdata_len);
 	add_int_to_abs_time(atp, time_to_expir, &ntp->expir_time);
-	ntp->start_time.at_sec = atp->at_sec;
-	ntp->start_time.at_usec = atp->at_usec;
+	ntp->start_time.tv_sec = atp->tv_sec;
+	ntp->start_time.tv_nsec = atp->tv_nsec;
 	tp = (GT_TIMER *)timeroot;
 	tpp = NULL;
 	while (tp)
@@ -1002,10 +1078,14 @@ STATICFNDEF void remove_timer(TID tid)
  */
 void sys_canc_timer()
 {
-#	ifdef BSD_TIMER
+	int	save_errno;
+#	ifndef YDB_USE_POSIX_TIMERS
 	struct itimerval zero;
 
 	memset(&zero, 0, SIZEOF(struct itimerval));
+#	else
+	assert(posix_timer_created);
+#	endif
 	assert(timer_active);
 	/* In case of canceling the system timer, we do not care if we succeed. Consider the two scenarios:
 	 *   1) The process is exiting, so all timers must have been removed anyway, and regardless of whether the system
@@ -1015,12 +1095,17 @@ void sys_canc_timer()
 	 *      database access has been established) would fail; if no other timer is scheduled, then the canceled entry
 	 *      must have been removed off the queue anyway, so no processing would occur on a pop.
 	 */
-	if (-1 == setitimer(ITIMER_REAL, &zero, &old_sys_timer))
+#	ifdef YDB_USE_POSIX_TIMERS
+	if (-1 == timer_delete(posix_timer_id))
 	{
-		REPORT_SETITIMER_ERROR("ITIMER_REAL", zero, FALSE, errno);
+		save_errno = errno;
+		assert(FALSE);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_delete()"), CALLFROM, save_errno);
 	}
+	CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE;
 #	else
-	alarm(0);
+	if (-1 == setitimer(ITIMER_REAL, &zero, &old_sys_timer))
+		REPORT_SETITIMER_ERROR("ITIMER_REAL", zero, FALSE, errno);
 #	endif
 	timer_active = FALSE;		/* no timer is active now */
 }
@@ -1083,7 +1168,7 @@ STATICFNDEF void init_timers()
 
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
-	act.sa_handler = timer_handler;
+	act.sa_handler = (sighandler_t)timer_handler;
 	sigaction(SIGALRM, &act, &prev_alrm_handler);
 	if (first_timeset && 					/* not from timer_handler to prevent dup message */
 	    (SIG_IGN != prev_alrm_handler.sa_handler) &&	/* as set by sig_init */
@@ -1109,7 +1194,7 @@ void check_for_deferred_timers(void)
 
 	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does SIGPROCMASK() etc. */
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
-	timer_handler(DUMMY_SIG_NUM);
+	timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 }
 
 /* Check for timer pops. If any timers are on the queue, pretend a sigalrm occurred, and we have to
@@ -1126,7 +1211,7 @@ void check_for_timer_pops()
 	sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
 	if (!first_timeset)
 	{
-		if (timer_handler != current_sa.sa_handler)	/* check if what we expected */
+		if ((sighandler_t)timer_handler != current_sa.sa_handler)	/* check if what we expected */
 		{
 			init_timers();
 			if (!stolen_timer)
@@ -1149,7 +1234,7 @@ void check_for_timer_pops()
 	}
 	if (timeroot && (1 > timer_stack_count))
 	{
-		timer_handler(DUMMY_SIG_NUM);
+		timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 	}
 	if (stolenwhen)
 	{

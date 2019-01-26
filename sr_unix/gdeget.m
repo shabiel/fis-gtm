@@ -3,6 +3,9 @@
 ; Copyright (c) 2006-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -25,7 +28,7 @@ LOAD
 	s olabel=label
 	s mach=$p($zver," ",4)
 	n gldfmt
-	i ($ze(label,1,9)'="GTCGBDUNX") zm gdeerr("GDUNKNFMT"):file,gdeerr("INPINTEG")
+	i ($ze(label,1,9)'="GTCGBDUNX") d message^GDE(gdeerr("GDUNKNFMT"),$zwrite(file)),message^GDE(gdeerr("INPINTEG"),"""""")
 	s gldfmt=+$ze(label,11,12)	; 10th byte could be 1 indicating 64-bit platform so ignore that for format check
 	s seghasencrflag=FALSE
 	i gldfmt>5 s seghasencrflag=TRUE
@@ -72,12 +75,12 @@ LOAD
 	s v30=0
 	i (label="GTCGBLDIR006")!(label="GTCGBDUNX002") s label=hdrlab,v30=4,update=1 ;autoconvert
 	i v30=4 n gtm64 s gtm64=FALSE
-	i label'=hdrlab zm gdeerr("GDUNKNFMT"):file,gdeerr("INPINTEG")
+	i label'=hdrlab d message^GDE(gdeerr("GDUNKNFMT"),$zwrite(file)),message^GDE(gdeerr("INPINTEG"),"""""")
 	s filesize=$$bin2num($ze(rec,13,16))
 	s abs=abs+SIZEOF("gd_header")
 ; contents
 	s ptrsize=$s((gtm64=TRUE):8,1:4)
-	i $ze(rec,abs,abs+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) zm gdeerr("INPINTEG")	; gd_addr.local_locks
+	i $ze(rec,abs,abs+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")	; gd_addr.local_locks
 	s abs=abs+ptrsize
 	s contents("maxrecsize")=$$bin2num($ze(rec,abs,abs+3)),abs=abs+4
 	n cntsize  s cntsize=$s((gldfmt>8):4,1:2)				; counters are 4-bytes since V6.1
@@ -85,7 +88,7 @@ LOAD
 	s contents("regioncnt")=$$bin2num($ze(rec,abs,abs+cntsize-1)),abs=abs+cntsize
 	s contents("segmentcnt")=$$bin2num($ze(rec,abs,abs+cntsize-1)),abs=abs+cntsize
 	i '(gldfmt>8) d
-	. i $ze(rec,abs,abs+cntsize-1)'=$tr($j("",cntsize)," ",ZERO) zm gdeerr("INPINTEG") ; filler
+	. i $ze(rec,abs,abs+cntsize-1)'=$tr($j("",cntsize)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""") ; filler
 	. s abs=abs+cntsize
 	. i gtm64=TRUE s abs=abs+4						; including 4-byte padding
 	e  d
@@ -99,25 +102,25 @@ LOAD
 	s abs=abs+(3*ptrsize)							;skip link, tab_ptr and id pointers
 	s contents("end")=$$bin2num($ze(rec,abs,abs+ptrsize-1)),abs=abs+ptrsize
 	i (gldfmt>8) s abs=abs+16	; reserved for runtime fillers
-	i contents("regioncnt")'=contents("segmentcnt") zm gdeerr("INPINTEG")
-	i contents("regioncnt")-1>contents("mapcnt") zm gdeerr("INPINTEG")
+	i contents("regioncnt")'=contents("segmentcnt") d message^GDE(gdeerr("INPINTEG"),"""""")
+	i contents("regioncnt")-1>contents("mapcnt") d message^GDE(gdeerr("INPINTEG"),"""""")
 ; verify offsets
-	i abs'=(SIZEOF("gd_header")+SIZEOF("gd_contents")+1) zm gdeerr("INPINTEG")
+	i abs'=(SIZEOF("gd_header")+SIZEOF("gd_contents")+1) d message^GDE(gdeerr("INPINTEG"),"""""")
 	s x=contents("maps")
-	i x+1'=(abs-SIZEOF("gd_header")) zm gdeerr("INPINTEG")
+	i x+1'=(abs-SIZEOF("gd_header")) d message^GDE(gdeerr("INPINTEG"),"""""")
 	s x=x+(contents("mapcnt")*SIZEOF("gd_map"))
 	i (gldfmt>8)  s x=x+contents("varmapslen")		; add variable maps section too if available
-	i x'=contents("regions") zm gdeerr("INPINTEG")
+	i x'=contents("regions") d message^GDE(gdeerr("INPINTEG"),"""""")
 	s x=x+(contents("regioncnt")*SIZEOF("gd_region"))
-	i x'=contents("segments") zm gdeerr("INPINTEG")
+	i x'=contents("segments") d message^GDE(gdeerr("INPINTEG"),"""""")
 	s x=x+(contents("segmentcnt")*(SIZEOF("gd_segment")-v30))
 	i (gldfmt>8) d
-	. i x'=contents("gblnames") zm gdeerr("INPINTEG")
+	. i x'=contents("gblnames") d message^GDE(gdeerr("INPINTEG"),"""""")
 	. s x=x+(contents("gblnamecnt")*(SIZEOF("gd_gblname")))
 	i (gldfmt>11),(contents("inst")>0) d
-	. i x'=contents("inst") zm gdeerr("INPINTEG")
+	. i x'=contents("inst") d message^GDE(gdeerr("INPINTEG"),"""""")
 	. s x=x+(SIZEOF("gd_inst_info"))
-	i x'=contents("end") zm gdeerr("INPINTEG")
+	i x'=contents("end") d message^GDE(gdeerr("INPINTEG"),"""""")
 	s rel=abs
 ; maps - verify that mapped regions and regions are 1-to-1
 	k reglist
@@ -131,26 +134,26 @@ LOAD
 	. s newabs=(((abs-1)+(ptrsize-1))\ptrsize*ptrsize)+1 ; make "abs" 8-byte aligned for 64bit platforms (and 4-byte for 32-bit)
 	. s rel=rel+(newabs-abs)			; adjust "rel" to take "abs"-alignment-adjustment into account
 	. s abs=newabs
-	. i (abs-tmpabs)'=contents("varmapslen") zm gdeerr("INPINTEG")
+	. i (abs-tmpabs)'=contents("varmapslen") d message^GDE(gdeerr("INPINTEG"),"""""")
 	s s=""
 	f i=1:1:contents("regioncnt") s s=$o(reglist(s))
-	i $zl($o(reglist(s))) zm gdeerr("INPINTEG")
-	i i'=contents("regioncnt") zm gdeerr("INPINTEG")
+	i $zl($o(reglist(s))) d message^GDE(gdeerr("INPINTEG"),"""""")
+	i i'=contents("regioncnt") d message^GDE(gdeerr("INPINTEG"),"""""")
 ; regions
 	k regs,xregs s regs=0
 	f i=1:1:contents("regioncnt") d region
-	i regs'=contents("regioncnt") zm gdeerr("INPINTEG")
+	i regs'=contents("regioncnt") d message^GDE(gdeerr("INPINTEG"),"""""")
 ; segments
 	k segs,xsegs s segs=0
 	f i=1:1:contents("segmentcnt") d segment
-	i segs'=contents("segmentcnt") zm gdeerr("INPINTEG")
+	i segs'=contents("segmentcnt") d message^GDE(gdeerr("INPINTEG"),"""""")
 ; gblnames
 	i (gldfmt>8) d
 	. k gnams s gnams=0
 	. f i=1:1:contents("gblnamecnt") d gblname(i)
 	e  s gnams=0
 	; wait until "gnams" is setup before checking maps, as "gnams" is used in case of subscripted gvns in map entries
-	zm:'$$MAP2NAM^GDEMAP(.map) gdeerr("INPINTEG")
+	d:'$$MAP2NAM^GDEMAP(.map) message^GDE(gdeerr("INPINTEG"),"""""")
 	i (gldfmt'>10) do
 	. ; remove any %Y* name mappings in old gld (unsubscripted OR subscripted) as documented
 	. n s s s="" f  s s=$o(nams(s)) q:s=""  i $ze(s,1,2)="%Y"  k nams(s)  i $incr(nams,-1)
@@ -161,7 +164,7 @@ LOAD
 	e  s inst=0
 ; template access method
 	s tmpacc=$$gderead(4)
-	i accmeth'[("\"_tmpacc) zm gdeerr("INPINTEG")
+	i accmeth'[("\"_tmpacc) d message^GDE(gdeerr("INPINTEG"),"""""")
 ; templates
 	k tmpreg,tmpseg
 	d cretmps
@@ -177,7 +180,7 @@ LOAD
 	f s="EXTENSION","FILE_NAME" d tmpreg(s)
 	i (reghasv600fields=TRUE) d tmpreg("INST_FREEZE_ON_ERROR")
 	f s="JOURNAL","KEY_SIZE" d tmpreg(s)
-	if (gldfmt>10) d tmpreg("LOCK_CRIT") s tmpreg("LOCK_CRIT")='tmpreg("LOCK_CRIT")
+	if (gldfmt>10) d tmpreg("LOCK_CRIT_SEPARATE") s tmpreg("LOCK_CRIT_SEPARATE")='tmpreg("LOCK_CRIT_SEPARATE")
 	f s="NULL_SUBSCRIPTS" d tmpreg(s)
 	i (reghasv600fields=TRUE) d tmpreg("QDBRUNDOWN")
 	f s="RECORD_SIZE" d tmpreg(s)
@@ -206,24 +209,24 @@ LOAD
 	c file
 ; resolve
 	s s=""
-	f  s s=$o(nams(s)) q:'$zl(s)  zm:'$d(xregs(nams(s))) gdeerr("INPINTEG") s nams(s)=xregs(nams(s)) d:nams(s)?1L.E
+	f  s s=$o(nams(s)) q:'$zl(s)  d:'$d(xregs(nams(s))) message^GDE(gdeerr("INPINTEG"),"""""") s nams(s)=xregs(nams(s)) d:nams(s)?1L.E
 	. i $i(nams,-1),$d(regs(nams(s))),$i(regs,-1),$i(segs,-1) k regs(nams(s)),segs(nams(s))
 	. k nams(s)
-	f  s s=$o(regs(s)) q:'$zl(s)  zm:'$d(xsegs(regs(s,"DYNAMIC_SEGMENT"))) gdeerr("INPINTEG") d
+	f  s s=$o(regs(s)) q:'$zl(s)  d:'$d(xsegs(regs(s,"DYNAMIC_SEGMENT"))) message^GDE(gdeerr("INPINTEG"),"""""") d
 	. s regs(s,"DYNAMIC_SEGMENT")=xsegs(regs(s,"DYNAMIC_SEGMENT"))
 	f  s s=$o(segs(s)) q:'$zl(s)  s am=segs(s,"ACCESS_METHOD") d
 	. s x=""
 	. f  s x=$o(segs(s,x)) q:x=""  d
-	. . i x'="FILE_NAME",'$zl(tmpseg(am,x)) zm:segs(s,x) gdeerr("INPINTEG") s segs(s,x)=""
+	. . i x'="FILE_NAME",'$zl(tmpseg(am,x)) d:segs(s,x) message^GDE(gdeerr("INPINTEG"),"""""") s segs(s,x)=""
 	; fall through !
 verify:	s x=$$ALL^GDEVERIF
-	i 'x zm gdeerr("INPINTEG")
+	i 'x d message^GDE(gdeerr("INPINTEG"),"""""")
 	q
 
 ;----------------------------------------------------------------------------------------------------------------------------------
 
 badfile ;file access failed
-	s:'debug $et="" u file:exc="" s abortzs=$zs zm gdeerr("GDREADERR"):file,+abortzs
+	s:'debug $et="" u file:exc="" s abortzs=$zs d message^GDE(gdeerr("GDREADERR"),$zwrite(file)),message^GDE(+abortzs,"""""")
 	d GETOUT^GDEEXIT
 	h
 	;
@@ -238,8 +241,8 @@ bin2num:(bin)	; binary number -> number
 ;----------------------------------------------------------------------------------------------------------------------------------
 regoffchk:(x)	; check region offset
 	s reglist(x)="",x=x-contents("regions")
-	i x#SIZEOF("gd_region") zm gdeerr("INPINTEG")
-	i x\SIZEOF("gd_region")'<contents("regioncnt") zm gdeerr("INPINTEG")
+	i x#SIZEOF("gd_region") d message^GDE(gdeerr("INPINTEG"),"""""")
+	i x\SIZEOF("gd_region")'<contents("regioncnt") d message^GDE(gdeerr("INPINTEG"),"""""")
 	q
 
 mapPreV61:
@@ -274,13 +277,13 @@ mapvariable:(i)
 	s regoffset=maparray(i,2)
 	s gvnamelen=maparray(i,3)
 	s gvkeylen=maparray(i,4)
-	i (keyoffset+1+SIZEOF("gd_header"))'=abs zm gdeerr("INPINTEG")
-	i (keyoffset+gvkeylen)>contents("regions") zm gdeerr("INPINTEG")
+	i (keyoffset+1+SIZEOF("gd_header"))'=abs d message^GDE(gdeerr("INPINTEG"),"""""")
+	i (keyoffset+gvkeylen)>contents("regions") d message^GDE(gdeerr("INPINTEG"),"""""")
 	f  q:(($zl(rec)-(rel-1))'<gvkeylen)  d nextrec
 	s s=$ze(rec,rel,rel+gvkeylen-1)
-	i $ze(s,gvnamelen+1)'=ZERO zm gdeerr("INPINTEG")
-	i $ze(s,gvkeylen-1)'=ZERO zm gdeerr("INPINTEG")
-	i $ze(s,gvkeylen)'=ZERO zm gdeerr("INPINTEG")
+	i $ze(s,gvnamelen+1)'=ZERO d message^GDE(gdeerr("INPINTEG"),"""""")
+	i $ze(s,gvkeylen-1)'=ZERO d message^GDE(gdeerr("INPINTEG"),"""""")
+	i $ze(s,gvkeylen)'=ZERO d message^GDE(gdeerr("INPINTEG"),"""""")
 	s s=$ze(s,1,gvkeylen-2)
 	s map(s)=regoffset
 	s rel=rel+gvkeylen
@@ -296,13 +299,13 @@ region:
 	s regs(s,"RECORD_SIZE")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	s regs(s,"DYNAMIC_SEGMENT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+ptrsize
 	s x=regs(s,"DYNAMIC_SEGMENT")-contents("segments")
-	i x#(SIZEOF("gd_segment")-v30) zm gdeerr("INPINTEG")						; autoconvert
-	i x\(SIZEOF("gd_segment")-v30)'<contents("segmentcnt") zm gdeerr("INPINTEG")			; autoconvert
-	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) zm gdeerr("INPINTEG")		; static segment
+	i x#(SIZEOF("gd_segment")-v30) d message^GDE(gdeerr("INPINTEG"),"""""")						; autoconvert
+	i x\(SIZEOF("gd_segment")-v30)'<contents("segmentcnt") d message^GDE(gdeerr("INPINTEG"),"""""")			; autoconvert
+	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")		; static segment
 	s rel=rel+ptrsize
-	i $ze(rec,rel)'=ZERO zm gdeerr("INPINTEG")							; OPEN state
+	i $ze(rec,rel)'=ZERO d message^GDE(gdeerr("INPINTEG"),"""""")							; OPEN state
 	s rel=rel+1
-	i $ze(rec,rel)'=ZERO zm gdeerr("INPINTEG")							; lock_write
+	i $ze(rec,rel)'=ZERO d message^GDE(gdeerr("INPINTEG"),"""""")							; lock_write
 	s rel=rel+1
 	s regs(s,"NULL_SUBSCRIPTS")=$$bin2num($ze(rec,rel)),rel=rel+1
 	s regs(s,"JOURNAL")=$$bin2num($ze(rec,rel)),rel=rel+1
@@ -329,14 +332,14 @@ region:
 	s regs(s,"BUFFER_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	i regs(s,"BUFFER_SIZE")<minreg("BUFFER_SIZE")  s regs(s,"BUFFER_SIZE")=minreg("BUFFER_SIZE"),update=1
 	s regs(s,"BEFORE_IMAGE")=$$bin2num($ze(rec,rel)),rel=rel+1
-	i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")				; 4 chars
+	i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")				; 4 chars
 	s rel=rel+4
 	s regs(s,"COLLATION_DEFAULT")=$$bin2num($ze(rec,rel)),rel=rel+1					; default collating type
 	; stdnullcoll is applicable from V5
 	i 'v44&'v30 s regs(s,"STDNULLCOLL")=$$bin2num($ze(rec,rel))
 	e  d
-	. i $ze(rec,rel)'=$tr($j("",1)," ",ZERO) zm gdeerr("INPINTEG")					; 1 chars
-	. s regs(s,"STDNULLCOLL")=0
+	. i $ze(rec,rel)'=$tr($j("",1)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")					; 1 chars
+	. s regs(s,"STDNULLCOLL")=1
 	s rel=rel+1
 	i (reghasv600fields=TRUE)  d
 	. s regs(s,"INST_FREEZE_ON_ERROR")=$$bin2num($ze(rec,rel)),rel=rel+1
@@ -346,17 +349,17 @@ region:
 	. s regs(s,"QDBRUNDOWN")=0
 	s l=$$bin2num($ze(rec,rel)),rel=rel+1 ;jnl_file_len
 	s regs(s,"FILE_NAME")=$ze(rec,rel,rel+l-1),rel=rel+SIZEOF("file_spec")
-	i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")				; reserved
+	i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")				; reserved
 	s rel=rel+8											; reserved
 	i (gldfmt>8) s rel=rel+4 ; "gd_region.is_spanned" not needed by GDE
 	i (gldfmt>10) s rel=rel+4 ; "gd_region.statsDB_reg_index" never used by GDE (generated by gdeput if needed)
 	s regs(s,"EPOCHTAPER")=1
-	s regs(s,"AUTODB")=0,regs(s,"STATS")=1,regs(s,"LOCK_CRIT")=0
+	s regs(s,"AUTODB")=0,regs(s,"STATS")=1,regs(s,"LOCK_CRIT_SEPARATE")=0
 	i (gldfmt>9) do
 	. s regs(s,"EPOCHTAPER")=$$bin2num($ze(rec,rel)),rel=rel+1
 	. i (gldfmt>10) do
 	. . s x=$$bin2num($ze(rec,rel)),regs(s,"AUTODB")=x#2,regs(s,"STATS")='(x\2#2),rel=rel+1
-	. . s regs(s,"LOCK_CRIT")='$$bin2num($ze(rec,rel)),rel=rel+1
+	. . s regs(s,"LOCK_CRIT_SEPARATE")='$$bin2num($ze(rec,rel)),rel=rel+1
 	. . s rel=rel+34	; reserved for runtime fillers
 	. s rel=rel+11		; reserved for runtime fillers
 	e  i (gldfmt=9) s rel=rel+12	; reserved for runtime fillers
@@ -368,7 +371,7 @@ segment:
 	s segs=segs+1
 	s x=$$bin2num($ze(rec,rel+SIZEOF("am_offset")-v30,rel+SIZEOF("am_offset")-v30+3))		; autoconvert
 	s am=$s(x=1:"BG",x=2:"MM",x=4:"USER",1:"ERROR")
-	i am="ERROR" zm gdeerr("INPINTEG")
+	i am="ERROR" d message^GDE(gdeerr("INPINTEG"),"""""")
 	s l=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s s=$ze(rec,rel,rel+l-1),rel=rel+MAXSEGLN,xsegs(abs-1-SIZEOF("gd_header"))=s
 	s segs(s,"ACCESS_METHOD")=am
@@ -377,15 +380,15 @@ segment:
 	s segs(s,"BLOCK_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"EXTENSION_COUNT")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"ALLOCATION")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
-	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) zm gdeerr("INPINTEG")	; reserved for clb
+	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")	; reserved for clb
 	s rel=rel+$s((gtm64=TRUE):12,1:4)							; padding
-	i $ze(rec,rel,rel+3)'=".DAT" zm gdeerr("INPINTEG")
+	i $ze(rec,rel,rel+3)'=".DAT" d message^GDE(gdeerr("INPINTEG"),"""""")
 	s rel=rel+4
 	s segs(s,"DEFER")=$$bin2num($ze(rec,rel))
 	s rel=rel+1
 	s x=$$bin2num($ze(rec,rel)),rel=rel+1
 	s segs(s,"FILE_TYPE")=$s(x=0:"DYNAMIC",1:"ERROR")
-	i segs(s,"FILE_TYPE")="ERROR" zm gdeerr("INPINTEG")
+	i segs(s,"FILE_TYPE")="ERROR" d message^GDE(gdeerr("INPINTEG"),"""""")
 	s segs(s,"BUCKET_SIZE")=$$bin2num($ze(rec,rel))
 	s rel=rel+1
 	s segs(s,"WINDOW_SIZE")=$$bin2num($ze(rec,rel))
@@ -401,9 +404,9 @@ segment:
 	e  s segs(s,"DEFER_ALLOCATE")=defseg("DEFER_ALLOCATE")
 	s rel=rel+4										; access method already processed
 	i (gldfmt=9)&(gtm64=TRUE) s rel=rel+4 							; 4-byte filler
-	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) zm gdeerr("INPINTEG")	; file_cntl pointer
+	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")	; file_cntl pointer
 	s rel=rel+ptrsize
-	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) zm gdeerr("INPINTEG")	; repl_list pointer
+	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")	; repl_list pointer
 	s rel=rel+ptrsize
 	; If the gld file has the encrytion flag, read it. Also read only if
 	; the current platform is encrpytion enabled. Otherwise default to 0
@@ -421,10 +424,10 @@ gblname:(i)
 	i $zl(rec)-(rel-1)<SIZEOF("gd_gblname") d nextrec
 	s gnams=gnams+1
 	s s=$ze(rec,rel,rel+SIZEOF("mident")-1),rel=rel+SIZEOF("mident")
-	s x=$zf(s,ZERO)-2 i x=-2 zm gdeerr("INPINTEG")	; it better be null terminated
+	s x=$zf(s,ZERO)-2 i x=-2 d message^GDE(gdeerr("INPINTEG"),"""""")	; it better be null terminated
 	s s=$ze(s,1,x)
 	s x=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4 	; read 4 bytes
-	i x>maxgnam("COLLATION") zm gdeerr("INPINTEG")	; collation # should be <= 255
+	i x>maxgnam("COLLATION") d message^GDE(gdeerr("INPINTEG"),"""""")	; collation # should be <= 255
 	s y=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4 	; read 4 bytes
 	d chkcoll^GDEPARSE(x,s,y)
 	s gnams(s,"COLLATION")=x
@@ -434,9 +437,9 @@ gblname:(i)
 inst:
 	n x,y
 	i $zl(rec)-(rel-1)<SIZEOF("gd_inst_info") d nextrec
-	i $zl(rec)-(rel-1)<SIZEOF("gd_inst_info") zm gdeerr("INPINTEG")
+	i $zl(rec)-(rel-1)<SIZEOF("gd_inst_info") d message^GDE(gdeerr("INPINTEG"),"""""")
 	s y=$ze(rec,rel,rel+SIZEOF("gd_inst_info")),rel=rel+SIZEOF("gd_inst_info")
-	s x=$zf(y,ZERO)-2 i x=-2 zm gdeerr("INPINTEG")	; it better be null terminated
+	s x=$zf(y,ZERO)-2 i x=-2 d message^GDE(gdeerr("INPINTEG"),"""""")	; it better be null terminated
 	s y=$ze(y,1,x)
 	s inst("FILE_NAME")=y,inst=1
 	q
@@ -444,7 +447,7 @@ gderead:(max)
 	n s
 	i $zl(rec)-(rel-1)<3 d nextrec
 	s l=$ze(rec,rel,rel+2),rel=rel+3,abs=abs+3
-	i l>max zm gdeerr("INPINTEG")
+	i l>max d message^GDE(gdeerr("INPINTEG"),"""""")
 	i $zl(rec)-(rel-1)<l d nextrec
 	s s=$ze(rec,rel,rel+l-1),rel=rel+l,abs=abs+l
 	q s
@@ -497,12 +500,12 @@ cretmps:
 	s tmpreg("JOURNAL")=0
 	s tmpreg("INST_FREEZE_ON_ERROR")=0
 	s tmpreg("KEY_SIZE")=dflreg("KEY_SIZE")
-	s tmpreg("LOCK_CRIT")=1
+	s tmpreg("LOCK_CRIT_SEPARATE")=1
 	s tmpreg("NULL_SUBSCRIPTS")=0
 	s tmpreg("QDBRUNDOWN")=0
 	s tmpreg("RECORD_SIZE")=256
 	s tmpreg("STATS")=1
-	s tmpreg("STDNULLCOLL")=0
+	s tmpreg("STDNULLCOLL")=1
 	s tmpreg("SYNC_IO")=0
 	s tmpreg("YIELD_LIMIT")=8
 	n tmpsegcommon

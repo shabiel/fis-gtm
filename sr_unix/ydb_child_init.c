@@ -36,6 +36,7 @@
 #include "repl_inst_ftok_counter_halted.h"
 #include "add_inter.h"
 #include "eintr_wrapper_semop.h"
+#include "getjobnum.h"
 
 typedef enum
 {
@@ -44,7 +45,7 @@ typedef enum
 	RECVPOOL_REG = 3,
 } ydb_reg_type_t;
 
-void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t tmp_jnlpool);
+STATICFNDCL void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t tmp_jnlpool);
 
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	boolean_t		skip_exit_handler;
@@ -55,6 +56,16 @@ GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	uint4			process_id;
 GBLREF	uint4			dollar_zjob;
+GBLREF	int			fork_after_ydb_init;
+GBLREF	boolean_t		noThreadAPI_active;
+GBLREF	boolean_t		simpleThreadAPI_active;
+#ifdef YDB_USE_POSIX_TIMERS
+GBLREF	pid_t			posix_timer_thread_id;
+GBLREF	boolean_t		posix_timer_created;
+#endif
+#ifdef DEBUG
+GBLREF	volatile boolean_t	timer_active;
+#endif
 
 /* Routine that is invoked right after a "fork()" in the child pid.
  * This will do needed setup so the parent and child pids are treated as different pids
@@ -72,14 +83,17 @@ int	ydb_child_init(void *param)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (process_id == getpid())
+	/* Verify entry conditions, make sure YDB CI environment is up etc. */
+	LIBYOTTADB_INIT(LYDB_RTN_CHILDINIT, (int));	/* Note: macro could "return" from this function in case of errors */
+	if (!fork_after_ydb_init)
 	{	/* "ydb_child_init" is being called again in child OR is being called from parent of "fork".
 		 * No more setup needed. Return right away.
 		 */
+		assert(process_id == getpid());
+		LIBYOTTADB_DONE;
 		return YDB_OK;
 	}
-	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_CHILDINIT);	/* Note: macro could "return" from this function in case of errors */
+	assert(process_id != getpid());
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -103,6 +117,11 @@ int	ydb_child_init(void *param)
 	ARLINK_ONLY(relinkctl_incr_nattached(RTNOBJ_REFCNT_INCR_CNT_TRUE));
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
+		assert(NULL != addr_ptr->gd_runtime);
+		/* Now that we are in a child process, but inherited the parent's memory as is due to the "fork",
+		 * clear any parent-related AIO activity. If needed, the child needs to do AIO activity afresh.
+		 */
+		IF_LIBAIO(addr_ptr->gd_runtime->thread_gdi = NULL;)
 		for (reg = addr_ptr->regions, reg_top = reg + addr_ptr->n_regions; reg < reg_top; reg++)
 		{
 			if (reg->open && !reg->was_open && IS_REG_BG_OR_MM(reg))
@@ -124,11 +143,30 @@ int	ydb_child_init(void *param)
 	assert(NULL == ftok_sem_reg);
 	LIBYOTTADB_DONE;
 	REVERT;
+	/* If SimpleAPI was in use in the parent, we can allow either SimpleAPI or SimpleThreadAPI in the child
+	 * as we are guaranteed at this point that there is no other thread in the child active (let alone doing YottaDB calls).
+	 * Therefore reset "noThreadAPI_active" in case it was set to TRUE in the parent.
+	 */
+	assert(!noThreadAPI_active || !simpleThreadAPI_active);
+	noThreadAPI_active = FALSE;
+	/* Clear any timer related stuff that was started in this function.
+	 * This is so we still make ourselves able to use SimpleThreadAPI in the child process.
+	 */
+	/* "ydb_child_init_sem_incrcnt" invocation above could have started timers but it should have canceled
+	 * all the timers before returning. Therefore we have no need to call "sys_canc_timer" below. Assert that.
+	 */
+	assert(!timer_active);
+	clear_timers();
+	CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE;
+	/* Now that "ydb_child_init" has been run, the YottaDB engine is safe to use after a "fork"
+	 * in case "fork_after_ydb_init" has been set to TRUE. So that can be safely cleared.
+	 */
+	fork_after_ydb_init = FALSE;
 	return YDB_OK;
 }
 
 /* Note: cur_jnlpool is non-NULL if reg_type is JNLPOOL_REG and NULL otherwise */
-void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t cur_jnlpool)
+STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t cur_jnlpool)
 {
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;

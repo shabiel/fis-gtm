@@ -26,7 +26,6 @@
 
 #include "copy.h"
 #include "libyottadb.h"
-#include "rtnhdr.h"
 #include "lv_val.h"	/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "gtmci.h"
@@ -346,7 +345,8 @@ STATICFNDEF enum ydb_types scan_keyword(char **c)
 					break;
 				star_found = TRUE;
 			}
-			assert(star_count <= MAXIMUM_STARS);
+			if (star_count > MAXIMUM_STARS)
+				return ydb_notfound;
 			*c = exttab_scan_space(d);
 			return xctab[i].typ[star_count];
 		}
@@ -505,7 +505,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 		/* External call table is a null file */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
 	}
-	STRNCPY_STR(str_temp_buffer, str_buffer, MAX_TABLINE_LEN);
+	SNPRINTF(str_temp_buffer, MAX_TABLINE_LEN, "%s", str_buffer);
 	val.addr = str_temp_buffer;
 	val.len = STRLEN(str_temp_buffer);
 	/* Need to copy the str_buffer into another temp variable since

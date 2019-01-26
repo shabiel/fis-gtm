@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "setterm.h"
 #include "continue_handler.h"
 #include "gtmsecshr.h"
+#include "generic_signal_handler.h"
 
 GBLREF volatile int	is_suspended;
 GBLREF io_pair		io_std_device;
@@ -40,12 +41,13 @@ void continue_handler(int sig, siginfo_t *info, void *context)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig);
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig, IS_EXI_SIGNAL_FALSE, NULL, NULL);
 	/* Count how many times we get a continue-process signal (in DEBUG) */
 	DEBUG_ONLY(DBGGSSHR((LOGFLAGS, "continue_handler: pid %d, continue_proc_cnt bumped from %d to %d\n",
 			     process_id, TREF(continue_proc_cnt), TREF(continue_proc_cnt) + 1)));
 	DEBUG_ONLY((TREF(continue_proc_cnt))++);
  	assert(SIGCONT == sig);
+	/* Note - we do not forward this signal to the main routine but depend on our suspend/continue operations instead */
 	extract_signal_info(sig, info, context, &sig_info);
 	if (is_suspended)
 	{	/* Don't bother checking if user info is available. If info isn't available,

@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -56,7 +59,9 @@ int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, in
 {
 	int		bom_bytes = 0;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&iod->pair, -1, ch_set);
 	switch (*chset)
 	{
@@ -120,7 +125,9 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 	int4		sleep_time;
 	ABS_TIME	current_time, time_left;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	status = 0;
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
@@ -141,13 +148,13 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 			/* get the current time */
 			sys_get_curr_time(&current_time);
 			time_left = sub_abs_time(&end_time, &current_time);
-			if (0 > time_left.at_sec)
+			if (0 > time_left.tv_sec)
 			{
 				*msec_timeout = -1;
 				*bom_timeout = TRUE;
 			} else
-				*msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
-						       DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
+				*msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
+						       DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
 			/* make sure it terminates with bom_timeout */
 			if (!*bom_timeout && !*msec_timeout)
 				*msec_timeout = 1;
@@ -185,13 +192,13 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 				/* get the current time */
 				sys_get_curr_time(&current_time);
 				time_left = sub_abs_time(&end_time, &current_time);
-				if (0 > time_left.at_sec)
+				if (0 > time_left.tv_sec)
 				{
 					*msec_timeout = -1;
 					*bom_timeout = TRUE;
 				} else
-					*msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
-							       DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
+					*msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
+							       DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
 
 				/* make sure it terminates with bom_timeout */
 				if ((!*bom_timeout) && (!*msec_timeout))
@@ -260,7 +267,9 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 	boolean_t	bom_timeout = FALSE;
 	ABS_TIME	current_time, time_left;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
@@ -344,13 +353,13 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 				/* get the current time */
 				sys_get_curr_time(&current_time);
 				time_left = sub_abs_time(&end_time, &current_time);
-				if (0 > time_left.at_sec)
+				if (0 > time_left.tv_sec)
 				{
 					*msec_timeout = -1;
 					*follow_timeout = TRUE;
 				} else
-					*msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
-							       DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
+					*msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
+							       DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
 				/* make sure it terminates with follow_timeout */
 				if (!*follow_timeout && !*msec_timeout) *msec_timeout = 1;
 				sleep_left = *msec_timeout;
@@ -389,13 +398,13 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 					/* get the current time */
 					sys_get_curr_time(&current_time);
 					time_left = sub_abs_time(&end_time, &current_time);
-					if (0 > time_left.at_sec)
+					if (0 > time_left.tv_sec)
 					{
 						*msec_timeout = -1;
 						*follow_timeout = TRUE;
 					} else
-						*msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
-								       DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
+						*msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
+								       DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
 
 					/* make sure it terminates with follow_timeout */
 					if (!*follow_timeout && !*msec_timeout) *msec_timeout = 1;
@@ -525,7 +534,9 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 	d_rm_struct	*rm_ptr;
 	boolean_t	pipe_or_fifo = FALSE;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	if (rm_ptr->is_pipe || rm_ptr->fifo)
@@ -654,7 +665,9 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 	int		fildes;
 	boolean_t	pipe_or_fifo = FALSE;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);

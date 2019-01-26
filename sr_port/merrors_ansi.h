@@ -664,7 +664,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DSKSPACEFLOW */
 	   0,	/* GVINCRFAIL */
 	   0,	/* ISOLATIONSTSCHN */
-	   0,	/* REPLGBL2LONG */
+	   0,	/* UNUSEDMSG833 */
 	   0,	/* TRACEON */
 	   0,	/* TOOMANYCLIENTS */
 	   0,	/* NOEXCLUDE */
@@ -1002,7 +1002,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GETSOCKNAMERR */
 	   0,	/* INVYDBEXIT */
 	   0,	/* CIMAXPARAM */
-	   0,	/* CITPNESTED */
+	   0,	/* UNUSEDMSG1171 */
 	   0,	/* CIMAXLEVELS */
 	   0,	/* JOBINTRRETHROW */
 	   0,	/* STARFILE */
@@ -1215,7 +1215,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBBADUPGRDSTATE */
 	   0,	/* WRITEWAITPID */
 	   0,	/* ZGOCALLOUTIN */
-	   0,	/* REPLNOXENDIAN */
+	   0,	/* UNUSEDMSG1384 */
 	   0,	/* REPLXENDIANFAIL */
 	   0,	/* UNUSEDMSG1386 */
 	   0,	/* GTMSECSHRCHDIRF */
@@ -1343,7 +1343,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOTALLDBRNDWN */
 	   0,	/* TPRESTNESTERR */
 	   0,	/* JNLFILRDOPN */
-	   0,	/* SEQNUMSEARCHTIMEOUT */
+	   0,	/* UNUSEDMSG1514 */
 	   0,	/* FTOKKEY */
 	   0,	/* SEMID */
 	   0,	/* JNLQIOSALVAGE */

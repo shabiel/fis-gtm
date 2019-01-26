@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,7 +41,6 @@
 #include "collseq.h"
 #include "format_targ_key.h"
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>
 #include "gv_trigger.h"
 #endif
 
@@ -91,8 +93,8 @@ error_def(ERR_DBNONUMSUBS);
 #define TEXT3 " :              LVL=0x"
 #define TEXT4 ","
 
-#define MAX_UTIL_LEN STRLEN(TEXT0) + BLOCK_WINDOW + STRLEN(TEXT3) + LEVEL_WINDOW + STRLEN(TEXT4) + 1
-#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION)										\
+#define MAX_UTIL_LEN STR_LIT_LEN(TEXT0) + BLOCK_WINDOW + STR_LIT_LEN(TEXT3) + LEVEL_WINDOW + STR_LIT_LEN(TEXT4) + 1
+#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION)								\
 {														\
 	switch (ERROR_ACTION)											\
 	{													\
@@ -225,7 +227,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 		}
 		return TRUE;
 	}
-	if (blk_levl > MAX_BT_DEPTH)
+	if (MAX_BT_DEPTH <= blk_levl)
 	{
 		RTS_ERROR_FUNC(csa, ERR_DBBLEVMX, util_buff, error_action);
 		return FALSE;
