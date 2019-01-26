@@ -180,7 +180,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 		rtn_name.len = MIN(trigname->len, MAX_MIDENT_LEN);
 		rtn_name.addr = trigname->addr;
 		if (!reg->open)
-			gv_init_reg(reg, NULL);	/* Open the region before obtaining "csa" */
+			gv_init_reg(reg);	/* Open the region before obtaining "csa" */
 		regcsa = &FILE_INFO(reg)->s_addrs;
 		assert('#' == rtn_name.addr[rtn_name.len - 1]);
 		for ( ; rttabent <= rtn_names_end; rttabent++)
@@ -251,7 +251,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 			 * treat it as a failure to find the trigger.
 			 */
 			if (!reg->open)
-				gv_init_reg(reg, NULL);
+				gv_init_reg(reg);
 			if (&FILE_INFO(reg)->s_addrs != csa)
 			{
 				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr,
