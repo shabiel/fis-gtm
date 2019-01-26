@@ -257,7 +257,7 @@ void	op_unlock(void);
 void	op_unwind(void);
 void	op_use(mval *v, mval *p);
 void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...);
-void	op_write(mval *v);
+void __attribute__ ((sysv_abi))	op_write(mval *v);
 void	op_wteol(int4 n);
 void	op_wtff(void);
 void	op_wtone(int c);
