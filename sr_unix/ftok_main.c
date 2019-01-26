@@ -75,7 +75,11 @@ int ftok_main(int argc, char **argv, char **envp)
 
 	for ( ; i < argc; i++)
 	{
+		#ifdef __CYGWIN__
+		PRINTF("%20s  ::  %lld  [ 0x%llx ]\n", argv[i], FTOK(argv[i], id), FTOK(argv[i], id));
+		#else
 		PRINTF("%20s  ::  %d  [ 0x%x ]\n", argv[i], FTOK(argv[i], id), FTOK(argv[i], id));
+		#endif
 	}
 	PRINTF("\n");
 	return 0;
