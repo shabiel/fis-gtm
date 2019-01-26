@@ -15,7 +15,7 @@
 #ifndef __GTM_STARTUP_CHK_H__
 #define __GTM_STARTUP_CHK_H__
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__CYGWIN__)
 #define PROCSELF	"/proc/self/exe"
 #endif
 
