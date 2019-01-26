@@ -29,7 +29,11 @@
 	.text
 	.extern	mdb_condition_handler
 	.extern	op_unwind
+.ifdef cygwin
+	.extern _setjmp
+.else
 	.extern __sigsetjmp			# setjmp() is really __sigsetjmp(env,0)
+.endif
 
 ENTRY	dm_start
 	pushq	%rbp				# Preserve caller's %rbp register (aka REG_STACK_FRAME) which 16 byte aligns stack

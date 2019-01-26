@@ -17,7 +17,6 @@
 # Mumps error condition handler macros
 #-----------------------------------------------
 .ifdef cygwin
-# This is provisionally bumped up by 8. It needs be be verified on a 64-bit cygwin computer
 chnd_size	=	288
 .else
 chnd_size	=	232
@@ -45,7 +44,11 @@ chnd_jmp	=	24
 	addq	$chnd_jmp, REG64_ACCUM			# setjmp(ctxt->jmp)
 	movq	$0, REG64_ARG1
 	movq	REG64_ACCUM, REG64_ARG0
+.ifdef cygwin
+	call	_setjmp
+.else
 	call 	__sigsetjmp@PLT
+.endif
 	cmp	$0,REG32_RET0				# Which return is this?
 	je	\labelend
 	# This is the return when an error was unwound. Need to reduce rts_error_depth before doing anything else
