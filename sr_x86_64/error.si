@@ -42,11 +42,14 @@ chnd_jmp	=	24
 	leaq	mdb_condition_handler(REG_IP), REG64_SCRATCH1
 	movq    REG64_SCRATCH1, chnd_ch(%rax)		# ctxt->ch = x
 	addq	$chnd_jmp, REG64_ACCUM			# setjmp(ctxt->jmp)
-	movq	$0, REG64_ARG1
-	movq	REG64_ACCUM, REG64_ARG0
 .ifdef cygwin
+	# Use actual registers instead of friendly names for this to reduce confusion
+	movq	$0, %rdx
+	movq	REG64_ACCUM, %rcx
 	call	_setjmp
 .else
+	movq	$0, REG64_ARG1
+	movq	REG64_ACCUM, REG64_ARG0
 	call 	__sigsetjmp@PLT
 .endif
 	cmp	$0,REG32_RET0				# Which return is this?
