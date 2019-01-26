@@ -31,11 +31,6 @@ LITDEF	int cmerrors_undocarr[] = {
 };
 
 
-
-LITDEF	int cmerrors_undocarr[] = {
-};
-
-
 GBLDEF	err_ctl cmerrors_ctl = {
 	249,
 	"GTCM",
