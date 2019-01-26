@@ -170,18 +170,18 @@ typedef char  mach_inst;	/* machine instruction */
 typedef char  mach_inst;	/* machine instruction */
 #endif
 
-#ifdef Linux390
-#  define INTERLOCK_ADD(X,Y,Z)	(interlock_add(Z, (sm_int_ptr_t)(X)))
-#else
-#  ifdef __linux__
-#    ifdef __atomic_add_fetch
-#      define INTERLOCK_ADD(X,Y,Z)	(__atomic_add_fetch(X, Z, __ATOMIC_SEQ_CST))
-#    else
-#      define INTERLOCK_ADD(X,Y,Z)	(__sync_add_and_fetch(X, Z))
-#    endif
+/* Sam Habiel sez: Intrinsics are compiler dependent not OS dependent */
+/* This paragraph is changed to account for that */
+#if defined(__GNUC__) && !defined(__clang__)
+#  ifdef __atomic_add_fetch
+#    define INTERLOCK_ADD(X,Y,Z)	(__atomic_add_fetch(X, Z, __ATOMIC_SEQ_CST))
 #  else
-#    define INTERLOCK_ADD(X,Y,Z) (add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
+#    define INTERLOCK_ADD(X,Y,Z)	(__sync_add_and_fetch(X, Z))
 #  endif
+#elif defined(__clang__)
+#  define INTERLOCK_ADD(X,Y,Z) (__c11_atomic_fetch_add(X, Z, __ATOMIC_SEQ_CST))
+#else
+#  define INTERLOCK_ADD(X,Y,Z) (add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
 #endif
 
 #if __arm__
