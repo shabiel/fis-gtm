@@ -264,7 +264,7 @@ typedef struct
 /* gtm_shmget calls either the native shmget or libhugetlbfs's shmget which uses Huge Pages
  * to back the shared segment if possible. This is a Linux only library.
  */
-#if defined(__linux__) && (defined(__x86_64__) || defined(__i386__))
+#if defined(__linux__) && (defined(__x86_64__) || defined(__i386__)) || defined(__CYGWIN__)
 #	define shmget	gtm_shmget
 	extern int gtm_shmget(key_t , size_t , int);
 #endif

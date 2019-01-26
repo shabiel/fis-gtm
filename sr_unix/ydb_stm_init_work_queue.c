@@ -33,6 +33,8 @@ stm_workq *ydb_stm_init_work_queue(void)
 	 * (always 0) return code.
 	 */
 	(void)pthread_cond_init(&wq->cond, NULL);	/* Initialize the queue's condition variable */
+	#ifndef __CYGWIN__
 	INIT_STM_QUEUE_MUTEX(wq);			/* Initialize the queue's mutex */
+	#endif
 	return wq;
 }

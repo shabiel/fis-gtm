@@ -751,6 +751,7 @@ MBSTART {													\
 } MBEND
 
 /* Initialize an STM (simple thread mode) mutex */
+#ifndef __CYGWIN__
 #define INIT_STM_QUEUE_MUTEX(MUTEX_PTR) 											\
 MBSTART {															\
 	pthread_mutexattr_t	mattr;												\
@@ -772,6 +773,7 @@ MBSTART {															\
 	pthread_mutex_init(&((MUTEX_PTR)->mutex), &mattr);									\
 	pthread_mutexattr_destroy(&mattr);	/* Destroy mutex attribute block before it goes out of scope */			\
 } MBEND
+#endif
 
 /* tptoken is a 64-bit quantity. The least significant 57 bits is a counter (that matches the global variable "stmTPToken").
  * When passed to a user function, the current TP depth (dollar_tlevel) which can only go upto 127 (i.e. 7 bits) is bitwise-ORed
