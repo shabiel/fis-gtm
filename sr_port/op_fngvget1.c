@@ -29,7 +29,7 @@ GBLREF gd_region	*gv_cur_region;
  * op_fnget2, which, in turn, returns a specified "default" value; that slight of hand deals with order of evaluation issues
  * Any changes to this routine most likely have to be made in op_fngvget.c as well.
  */
-void	op_fngvget1(mval *dst)
+void __attribute__ ((sysv_abi))	op_fngvget1(mval *dst)
 {
 	boolean_t	gotit;
 	DCL_THREADGBL_ACCESS;

@@ -14,7 +14,7 @@
 
 GBLREF	int dollar_truth;
 
-void op_dt_false(void)
+void __attribute__ ((sysv_abi)) op_dt_false(void)
 {
 	dollar_truth = FALSE;
 }

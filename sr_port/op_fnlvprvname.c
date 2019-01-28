@@ -21,7 +21,7 @@
 GBLREF spdesc stringpool;
 GBLREF symval *curr_symval;
 
-void op_fnlvprvname(mval *src, mval *dst)
+void __attribute__ ((sysv_abi)) op_fnlvprvname(mval *src, mval *dst)
 {
 	ht_ent_mname	*p, *max, *top;
 	int 		n;

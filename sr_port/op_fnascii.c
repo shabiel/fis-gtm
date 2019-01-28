@@ -21,7 +21,7 @@ GBLREF	boolean_t	badchar_inhibit;
 GBLREF boolean_t        gtm_utf8_mode;
 
 /* Returns the Unicode code point of a character in a string at a given index */
-void	op_fnascii(int4 num, mval* in, mval* out)
+void __attribute__ ((sysv_abi))	op_fnascii(int4 num, mval* in, mval* out)
 {
 	int	bytelen;
 	unsigned int code;
@@ -85,7 +85,7 @@ void	op_fnascii(int4 num, mval* in, mval* out)
 }
 #endif /* UNICODE_SUPPORTED */
 
-void	op_fnzascii(int4 num, mval* in, mval* out)
+void __attribute__ ((sysv_abi))	op_fnzascii(int4 num, mval* in, mval* out)
 {
 	int	k ;
 	MV_FORCE_STR(in);

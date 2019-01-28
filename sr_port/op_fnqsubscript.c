@@ -57,7 +57,7 @@ error_def(ERR_NOCANONICNAME);
  *	none
  * -----------------------------------------------
  */
-void op_fnqsubscript(mval *src, int seq, mval *dst)
+void __attribute__ ((sysv_abi)) op_fnqsubscript(mval *src, int seq, mval *dst)
 {
 #ifdef UNICODE_SUPPORTED
 	int		char_len = 0;

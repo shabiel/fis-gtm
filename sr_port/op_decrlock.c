@@ -31,7 +31,7 @@ GBLREF tp_frame		*tp_pointer;
 
 error_def(ERR_TPLOCK);
 
-int	op_decrlock(mval *timeout)
+int __attribute__ ((sysv_abi))	op_decrlock(mval *timeout)
 {
 	int		count;
 	mlk_pvtblk	**prior;

@@ -14,7 +14,7 @@
 #include "cvtparm.h"
 #include "op.h"
 
-void op_cvtparm(int iocode, mval *src, mval *dst)
+void __attribute__ ((sysv_abi)) op_cvtparm(int iocode, mval *src, mval *dst)
 {
 	int status;
 

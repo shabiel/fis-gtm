@@ -32,7 +32,7 @@ LITREF	mval		literal_null;
  * that slight of hand deals with order of evaluation issues.
  * Any changes to this routine most likely have to be made in op_fngvget1.c as well.
  */
-void op_fngvget(mval *dst)
+void __attribute__ ((sysv_abi)) op_fngvget(mval *dst)
 {
 	boolean_t	gotit;
 	DCL_THREADGBL_ACCESS;

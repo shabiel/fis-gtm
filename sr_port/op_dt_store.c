@@ -14,7 +14,7 @@
 
 GBLREF	int dollar_truth;
 
-void op_dt_store(int truth_value)
+void __attribute__ ((sysv_abi)) op_dt_store(int truth_value)
 {
 	dollar_truth = truth_value;
 }

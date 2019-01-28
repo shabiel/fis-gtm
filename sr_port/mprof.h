@@ -159,15 +159,15 @@ mprof_stack_frame	*mprof_stack_pop(void);
 void			mprof_stack_free(void);
 
 /* functions required for the transfer table manipulations*/
-int op_mproflinefetch(), op_mproflinestart();
+int __attribute__ ((sysv_abi)) op_mproflinefetch(), op_mproflinestart();
 int op_mprofextexfun(), op_mprofextcall(), op_mprofexfun();
 int op_mprofcallb(), op_mprofcallw(), op_mprofcalll();
 int op_mprofcallspw(), op_mprofcallspl(), op_mprofcallspb();
-int op_mprofforlcldow(), op_mprofforlcldol(), op_mprofforlcldob(), op_mprofforchk1();
-int op_linefetch(), op_linestart();
+int __attribute__ ((sysv_abi)) op_mprofforlcldow(), op_mprofforlcldol(), op_mprofforlcldob(), op_mprofforchk1();
+int __attribute__ ((sysv_abi)) op_linefetch(), op_linestart();
 int op_extexfun(), op_extcall(), op_exfun(), op_forlcldo();
 int op_callw(), op_calll(), op_callb();
 int op_callspw(), op_callspl(), op_callspb();
-int op_forlcldow(), op_forlcldol(), op_forlcldob(), op_forchk1();
+int __attribute__ ((sysv_abi)) op_forlcldow(), op_forlcldol(), op_forlcldob(), op_forchk1();
 
 #endif /* MPROF_H_INCLUDED */

@@ -18,7 +18,7 @@ LITREF mval	literal_zero;
 
 error_def(ERR_NUMOFLOW);
 
-void add_mvals(mval *u, mval *v, int subtraction, mval *result)
+void __attribute__ ((sysv_abi)) add_mvals(mval *u, mval *v, int subtraction, mval *result)
 {
         int delta, uexp, vexp, exp;
         int4 m0, m1, n0, n1, x, factor;
@@ -224,7 +224,7 @@ result_is_v:
 	return;
 }
 
-void op_add (mval *u, mval *v, mval *s)
+void __attribute__ ((sysv_abi)) op_add (mval *u, mval *v, mval *s)
 {
         int4    m0, m1;
 	char	utype, vtype;
@@ -261,7 +261,7 @@ void op_add (mval *u, mval *v, mval *s)
         return;
 }
 
-void op_sub (mval *u, mval *v, mval *s)
+void __attribute__ ((sysv_abi)) op_sub (mval *u, mval *v, mval *s)
 {
         int4    m0, m1;
 	char	utype, vtype;

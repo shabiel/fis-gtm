@@ -17,7 +17,7 @@
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"
 
-void op_fnlength(mval *src, mval *dest)
+void __attribute__ ((sysv_abi)) op_fnlength(mval *src, mval *dest)
 {
 	MV_FORCE_STR(src);
 	MV_FORCE_LEN(src);
@@ -25,7 +25,7 @@ void op_fnlength(mval *src, mval *dest)
 }
 #endif
 
-void op_fnzlength(mval *src, mval *dest)
+void __attribute__ ((sysv_abi)) op_fnzlength(mval *src, mval *dest)
 {
 	MV_FORCE_STR(src);
 	MV_FORCE_MVAL(dest, src->str.len);

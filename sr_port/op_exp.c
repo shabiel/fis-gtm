@@ -33,7 +33,7 @@ error_def(ERR_DIVZERO);
 error_def(ERR_NEGFRACPWR);
 error_def(ERR_NUMOFLOW);
 
-void op_exp(mval *u, mval* v, mval *p)
+void __attribute__ ((sysv_abi)) op_exp(mval *u, mval* v, mval *p)
 {
 	mval 		u1, *u1_p;
 	double 		accuracy, exponent;

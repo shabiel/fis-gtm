@@ -37,7 +37,7 @@ GBLREF unsigned short 		proc_act_type;
 
 error_def	(ERR_INDEXTRACHARS);
 
-void	op_commarg(mval *v, unsigned char argcode)
+void __attribute__ ((sysv_abi))	op_commarg(mval *v, unsigned char argcode)
 {
 	int		rval;
 	icode_str	indir_src;

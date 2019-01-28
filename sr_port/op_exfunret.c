@@ -45,7 +45,7 @@ error_def(ERR_QUITALSINV);
  *	 difficult to track down. This behavior could easily be made optional at some
  *	 point in the future.
  */
-void op_exfunret(mval *retval)
+void __attribute__ ((sysv_abi)) op_exfunret(mval *retval)
 {
 	unsigned short	savtyp;
 	lv_val		*srclvc;

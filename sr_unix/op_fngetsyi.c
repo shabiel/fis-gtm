@@ -14,7 +14,7 @@
 #include "mdef.h"
 #include "op.h"
 
-void op_fngetsyi(mval *keyword,mval *node,mval *ret)
+void __attribute__ ((sysv_abi)) op_fngetsyi(mval *keyword,mval *node,mval *ret)
 {
 	assert (FALSE);
 }

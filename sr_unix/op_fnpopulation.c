@@ -35,7 +35,7 @@ STATICFNDCL int GetPieceCountFromPieceCache(mval *src, mval *del);
  *   dst - Return value mval - Returns the number of "pieces" in the string given the supplied delimiter. If the input
  *         string ends in a delimiter the count returned is +1'd.
  */
-void	op_fnpopulation(mval *src, mval *del, mval *dst)
+void __attribute__ ((sysv_abi))	op_fnpopulation(mval *src, mval *del, mval *dst)
 {
 	int 		charidx, piececnt;
 	mval		dummy;

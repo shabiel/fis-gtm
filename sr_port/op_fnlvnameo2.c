@@ -15,7 +15,7 @@
 
 error_def(ERR_ORDER2);
 
-void op_fnlvnameo2(mval *src,mval *dst,mval *direct)
+void __attribute__ ((sysv_abi)) op_fnlvnameo2(mval *src,mval *dst,mval *direct)
 {
 	int4	dummy_intval;
 

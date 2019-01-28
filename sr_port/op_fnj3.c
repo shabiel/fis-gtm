@@ -21,7 +21,7 @@ GBLREF spdesc stringpool;
 LITREF int4 ten_pwr[];
 
 
-void op_fnj3(mval *src,int width,int fract,mval *dst)
+void __attribute__ ((sysv_abi)) op_fnj3(mval *src,int width,int fract,mval *dst)
 {
 	int4 n, n1, m;
 	int w, digs, digs_used;

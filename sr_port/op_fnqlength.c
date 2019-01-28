@@ -31,7 +31,7 @@ error_def(ERR_NOCANONICNAME);
  *	none
  * -----------------------------------------------
  */
-void op_fnqlength(mval *src, mval *dst)
+void __attribute__ ((sysv_abi)) op_fnqlength(mval *src, mval *dst)
 {
 	int	dummy1;
 	int	dummy2;

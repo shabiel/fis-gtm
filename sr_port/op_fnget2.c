@@ -17,7 +17,7 @@ LITREF mval		literal_null;
 /* This gets a src from op_fnget1 or op_fngvget1 which either contains the "gotten" value or is undefined, in which case this
  * returns the specified default value; this slight of hand deals with order of evaluation issues.
  */
-void op_fnget2(mval *src, mval *def, mval *dst)
+void __attribute__ ((sysv_abi)) op_fnget2(mval *src, mval *def, mval *dst)
 {
 	MV_FORCE_DEFINED(def);
 	*dst = MV_DEFINED(src) ? *src : *def;

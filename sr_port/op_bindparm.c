@@ -42,7 +42,7 @@ error_def(ERR_ACTLSTTOOLONG);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 
-void op_bindparm(int frmc, int frmp_arg, ...)
+void __attribute__ ((sysv_abi)) op_bindparm(int frmc, int frmp_arg, ...)
 {
 	va_list		var;
 	uint4		mask;

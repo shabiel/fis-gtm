@@ -36,7 +36,7 @@ error_def(ERR_ALIASEXPECTED);
  *       To not do this constitutes an error and means QUIT * was NOT done as is
  *       required to create an alias on the caller side.
  */
-void op_exfunretals(mval *retval)
+void __attribute__ ((sysv_abi)) op_exfunretals(mval *retval)
 {
 	unsigned short	savtyp;
 

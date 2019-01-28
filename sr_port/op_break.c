@@ -40,7 +40,7 @@ error_def(ERR_BREAKZST);
 error_def(ERR_NOTPRINCIO);
 error_def(ERR_TEXT);
 
-void op_break(void)
+void __attribute__ ((sysv_abi)) op_break(void)
 {
 	bool		do_msg;
 	char		*c, *c_top, *line_start;

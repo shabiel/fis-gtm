@@ -14,6 +14,6 @@
 #include "mdef.h"
 #include "op.h"
 
-void op_fngetlki(mval *lkid_mval, mval *keyword, mval *ret)
+void __attribute__ ((sysv_abi)) op_fngetlki(mval *lkid_mval, mval *keyword, mval *ret)
 {	assert(FALSE);
 }

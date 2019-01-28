@@ -23,7 +23,7 @@ error_def(ERR_MAXSTRLEN);
 #include "gtm_utf8.h"
 GBLREF	boolean_t	badchar_inhibit;
 
-void op_fnj2(mval *src, int len, mval *dst)
+void __attribute__ ((sysv_abi)) op_fnj2(mval *src, int len, mval *dst)
 {
 	unsigned char 	*cp;
 	int 		n, size;
@@ -54,7 +54,7 @@ void op_fnj2(mval *src, int len, mval *dst)
 }
 #endif /* UNICODE_SUPPORTED */
 
-void op_fnzj2(mval *src, int len, mval *dst)
+void __attribute__ ((sysv_abi)) op_fnzj2(mval *src, int len, mval *dst)
 {
 	unsigned char	*cp;
 	int 		n;

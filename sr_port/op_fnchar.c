@@ -31,7 +31,7 @@ GBLREF	boolean_t	badchar_inhibit;
 error_def(ERR_INVDLRCVAL);
 
 /* Multi-byte implementation of $CHAR() that creates a string from Unicode codes */
-void op_fnchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
+void __attribute__ ((sysv_abi)) op_fnchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 {
 	va_list 	var;
 	int4 		ch, size, char_len;
@@ -68,7 +68,7 @@ void op_fnchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 #endif /* UNICODE_SUPPORTED */
 
 /* Single-byte implementation of $CHAR() that creates a string from ASCII codes */
-void op_fnzchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
+void __attribute__ ((sysv_abi)) op_fnzchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 {
 	va_list 	var;
 	int 		ch;

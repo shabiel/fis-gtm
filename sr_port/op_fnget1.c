@@ -15,7 +15,7 @@
 /* This code is similar in function to opp_fnget (assembler) except, if src is undefined, this returns an undefined value to signal
  * op_fnget2, which, in turn, returns a specified "default" value; this slight of hand deals with order of evaluation issues.
  */
-void op_fnget1(mval *src, mval *dst)
+void __attribute__ ((sysv_abi)) op_fnget1(mval *src, mval *dst)
 {
 	if (src && MV_DEFINED(src))
 	{

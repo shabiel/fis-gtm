@@ -42,7 +42,7 @@
 GBLREF boolean_t	gtm_utf8_mode;		/* We are indeed doing the UTF8 thang */
 GBLREF boolean_t	badchar_inhibit;	/* No BADCHAR errors should be signaled */
 
-void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
+void __attribute__ ((sysv_abi)) op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 {
 	unsigned char	*first, *last, *start, *end;
 	unsigned int	*pcoff, *pcoffmax, fnpc_indx, slen;
