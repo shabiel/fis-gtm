@@ -50,7 +50,7 @@ error_def(ERR_TEXT);
  * 	case conversion).
  *
  ***************************************************************************************************/
-void __attribute__ ((sysv_abi))	op_fnzconvert2(mval *src, mval *kase, mval *dst)
+void CYGWIN64_ABI	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 {
 	int		index;
 	int32_t		src_ustr_len, src_chlen, dst_chlen, ulen, dstlen = 0;
@@ -165,7 +165,7 @@ void __attribute__ ((sysv_abi))	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 }
 
-void __attribute__ ((sysv_abi))	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
+void CYGWIN64_ABI	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 {
 	UConverter	*from, *to;
 	int		dstlen;

@@ -71,7 +71,7 @@ error_def(ERR_ZSRCHSTRMCT);
  *          characteristics: length of the directory path, length of the (file) name, and length of the extension. For more details,
  *          refer to parse_file.h.
  */
-int  __attribute__ ((sysv_abi)) op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
+int  CYGWIN64_ABI op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 {
 	plength		pret;
 	char		pblk_buf[YDB_PATH_MAX], sanitized_buf[YDB_PATH_MAX];

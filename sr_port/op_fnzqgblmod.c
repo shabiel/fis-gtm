@@ -26,7 +26,7 @@ LITREF mval *fnzqgblmod_table[2];
 GBLREF gv_namehead 	*gv_target;
 GBLREF gd_region	*gv_cur_region;
 
-void __attribute__ ((sysv_abi))  op_fnzqgblmod(mval *v)
+void CYGWIN64_ABI  op_fnzqgblmod(mval *v)
 {
 	bool	gblmod;
 	DCL_THREADGBL_ACCESS;

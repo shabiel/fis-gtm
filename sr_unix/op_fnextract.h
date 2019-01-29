@@ -35,7 +35,7 @@ DBGUTFC_ONLY(STATICDEF uint4 xtrctcnt;)
 GBLREF boolean_t	badchar_inhibit;
 GBLREF boolean_t	gtm_utf8_mode;
 
-void __attribute__ ((sysv_abi)) OP_FNEXTRACT(int last, int first, mval *src, mval *dest)
+void CYGWIN64_ABI OP_FNEXTRACT(int last, int first, mval *src, mval *dest)
 {
 	char			*srcbase, *srctop, *srcptr;
 	unsigned char		*cptr, *cstart, *ctop;

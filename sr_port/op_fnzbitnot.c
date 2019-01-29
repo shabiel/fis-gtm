@@ -15,7 +15,7 @@
 
 GBLREF spdesc stringpool;
 
-void  __attribute__ ((sysv_abi)) op_fnzbitnot(mval *dst,mval *bitstr)
+void  CYGWIN64_ABI op_fnzbitnot(mval *dst,mval *bitstr)
 {
 	int		n, str_len;
 	unsigned char	*byte_1, *byte_n, *dist_byte, byte_len;

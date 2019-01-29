@@ -23,7 +23,7 @@
 
 GBLREF uint4	process_id;
 
-void  __attribute__ ((sysv_abi)) op_fnrandom (int4 interval, mval *ret)
+void  CYGWIN64_ABI op_fnrandom (int4 interval, mval *ret)
 {
 	static int4	seed = 0;
 	error_def	(ERR_RANDARGNEG);

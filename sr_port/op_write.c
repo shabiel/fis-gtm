@@ -20,7 +20,7 @@
 GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
 
-void __attribute__ ((sysv_abi)) op_write(mval *v)
+void CYGWIN64_ABI op_write(mval *v)
 {
 	GBLREF spdesc stringpool;
 	size_t insize, outsize;

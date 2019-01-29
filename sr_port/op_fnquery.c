@@ -65,7 +65,7 @@ error_def(ERR_STACKOFLOW);
  * cached in TREF(sapi_query_node_subs) with the count of valid entries in TREF(sapi_query_node_subs_cnt) while a
  * YDB runtime call returns a string in the dst mval.
  */
-void __attribute__ ((sysv_abi)) op_fnquery(int sbscnt, mval *dst, ...)
+void CYGWIN64_ABI op_fnquery(int sbscnt, mval *dst, ...)
 {
 	va_list		var;
 
@@ -73,7 +73,7 @@ void __attribute__ ((sysv_abi)) op_fnquery(int sbscnt, mval *dst, ...)
 	op_fnquery_va(sbscnt, dst, var);
 }
 
-void __attribute__ ((sysv_abi)) op_fnquery_va(int sbscnt, mval *dst, va_list var)
+void CYGWIN64_ABI op_fnquery_va(int sbscnt, mval *dst, va_list var)
 {
 	int			length, dstlen;
 	mval			tmp_sbs, *last_fnquery_ret;

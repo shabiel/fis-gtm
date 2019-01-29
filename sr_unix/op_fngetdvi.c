@@ -14,7 +14,7 @@
 #include "mdef.h"
 #include "op.h"
 
-void __attribute__ ((sysv_abi)) op_fngetdvi(mval *device, mval *keyword, mval* ret)
+void CYGWIN64_ABI op_fngetdvi(mval *device, mval *keyword, mval* ret)
 {
 	assert (FALSE);
 }

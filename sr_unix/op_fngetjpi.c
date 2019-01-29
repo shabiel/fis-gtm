@@ -58,7 +58,7 @@ enum 	kwind {
 	kw_end
 };
 
-void __attribute__ ((sysv_abi)) op_fngetjpi(mint jpid, mval *kwd, mval *ret)
+void CYGWIN64_ABI op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 {
 	struct tms	proc_times;
 	gtm_uint64_t	info, sc_clk_tck;

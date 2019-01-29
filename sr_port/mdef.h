@@ -26,6 +26,12 @@
 #define CLANG_SCA_ANALYZER_NORETURN
 #endif
 
+#if defined(__CYGWIN__) && defined(__x86_64__)
+#define CYGWIN64_ABI __attribute__ ((sysv_abi))
+#else
+#define CYGWIN64_ABI
+#endif
+
 #  define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
 #  define MSTR_DEF(name, length, string)	mstr name = {0, length, string}
 #  define MIDENT_CONST(name, string)	    mident name = {0, LEN_AND_LIT(string)}

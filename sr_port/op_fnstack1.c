@@ -39,7 +39,7 @@ GBLREF	stack_frame		*error_frame;
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	dollar_stack_type	dollar_stack;			/* structure containing $STACK related information */
 
-void  __attribute__ ((sysv_abi)) op_fnstack1(int level, mval *result)
+void  CYGWIN64_ABI op_fnstack1(int level, mval *result)
 {
  	int		cur_zlevel;
 

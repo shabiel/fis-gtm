@@ -43,7 +43,7 @@ GBLREF sgmnt_addrs	*cs_addrs;
 #endif
 
 #ifdef UNIX
-void __attribute__ ((sysv_abi)) gtm_fetch(unsigned int cnt_arg, unsigned int indxarg, ...)
+void CYGWIN64_ABI gtm_fetch(unsigned int cnt_arg, unsigned int indxarg, ...)
 #elif defined(VMS)
 void gtm_fetch(unsigned int indxarg, ...)
 #else

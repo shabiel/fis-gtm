@@ -18,7 +18,7 @@ LITREF mval	literal_zero;
 
 error_def(ERR_NUMOFLOW);
 
-void __attribute__ ((sysv_abi)) add_mvals(mval *u, mval *v, int subtraction, mval *result)
+void CYGWIN64_ABI add_mvals(mval *u, mval *v, int subtraction, mval *result)
 {
         int delta, uexp, vexp, exp;
         int4 m0, m1, n0, n1, x, factor;
@@ -224,7 +224,7 @@ result_is_v:
 	return;
 }
 
-void __attribute__ ((sysv_abi)) op_add (mval *u, mval *v, mval *s)
+void CYGWIN64_ABI op_add (mval *u, mval *v, mval *s)
 {
         int4    m0, m1;
 	char	utype, vtype;
@@ -261,7 +261,7 @@ void __attribute__ ((sysv_abi)) op_add (mval *u, mval *v, mval *s)
         return;
 }
 
-void __attribute__ ((sysv_abi)) op_sub (mval *u, mval *v, mval *s)
+void CYGWIN64_ABI op_sub (mval *u, mval *v, mval *s)
 {
         int4    m0, m1;
 	char	utype, vtype;

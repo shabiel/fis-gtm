@@ -57,7 +57,7 @@ error_def(ERR_NOCANONICNAME);
  *	none
  * -----------------------------------------------
  */
-void __attribute__ ((sysv_abi)) op_fnqsubscript(mval *src, int seq, mval *dst)
+void CYGWIN64_ABI op_fnqsubscript(mval *src, int seq, mval *dst)
 {
 #ifdef UNICODE_SUPPORTED
 	int		char_len = 0;

@@ -21,7 +21,7 @@
 
 GBLREF spdesc stringpool;
 
-void __attribute__ ((sysv_abi)) op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
+void CYGWIN64_ABI op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 {
 	va_list var;
 	mval *in, *src;

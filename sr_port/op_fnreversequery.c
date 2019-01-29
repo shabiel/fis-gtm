@@ -56,7 +56,7 @@ error_def(ERR_STACKOFLOW);
  * Get a varargs list started for that part. And invoke another function "op_fnreversequery_va" as that is also
  * used by "op_fnq2" which is the runtime entry point for $query(lvn,dir) where dir is an expression evaluating to -1.
  */
-void  __attribute__ ((sysv_abi)) op_fnreversequery(int sbscnt, mval *dst, ...)
+void  CYGWIN64_ABI op_fnreversequery(int sbscnt, mval *dst, ...)
 {
 	va_list		var;
 
@@ -82,7 +82,7 @@ void  __attribute__ ((sysv_abi)) op_fnreversequery(int sbscnt, mval *dst, ...)
  * cached in TREF(sapi_query_node_subs) with the count of valid entries in TREF(sapi_query_node_subs_cnt) while a
  * YDB runtime call returns a string in the dst mval.
 */
-void  __attribute__ ((sysv_abi)) op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
+void  CYGWIN64_ABI op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
 {
 	int			length, dstlen;
 	mval			tmp_sbs, *last_fnquery_ret;

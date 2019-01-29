@@ -31,7 +31,7 @@ error_def(ERR_NOCANONICNAME);
  *	none
  * -----------------------------------------------
  */
-void __attribute__ ((sysv_abi)) op_fnqlength(mval *src, mval *dst)
+void CYGWIN64_ABI op_fnqlength(mval *src, mval *dst)
 {
 	int	dummy1;
 	int	dummy2;

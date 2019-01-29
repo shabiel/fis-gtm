@@ -20,7 +20,7 @@ GBLREF spdesc stringpool;
 
 static unsigned char	mask[8] = {1,128,64,32,16,8,4,2};
 
-void  __attribute__ ((sysv_abi)) op_fnzbitset(mval *dst, mval *bitstr, int pos, int truthval)
+void  CYGWIN64_ABI op_fnzbitset(mval *dst, mval *bitstr, int pos, int truthval)
 {
 	int		mp, np, str_len;
 	unsigned char	*byte_1, *dist_byte, byte_len;

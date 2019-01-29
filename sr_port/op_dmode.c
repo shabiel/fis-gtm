@@ -61,7 +61,7 @@ LITREF	mval		literal_notimeout;
 error_def(ERR_NOTPRINCIO);
 error_def(ERR_NOPRINCIO);
 
-void __attribute__ ((sysv_abi))	op_dmode(void)
+void CYGWIN64_ABI	op_dmode(void)
 {
 	d_tt_struct		*tt_ptr;
 	gd_region		*save_re;

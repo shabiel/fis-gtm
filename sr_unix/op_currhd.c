@@ -25,7 +25,7 @@ GBLREF stack_frame	*frame_pointer;
 /* Routine to pick up the current routine header and stash it in lnk_proxy so the next indirect
  * call picks it up. We return 0 as the index into lnk_proxy to find the routine header.
  */
-int __attribute__ ((sysv_abi)) op_currhd(void)
+int CYGWIN64_ABI op_currhd(void)
 {
 	DCL_THREADGBL_ACCESS;
 

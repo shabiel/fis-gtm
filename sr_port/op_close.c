@@ -29,7 +29,7 @@ GBLREF io_desc		*active_device;
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_TEXT);
 
-void __attribute__ ((sysv_abi)) op_close(mval *v, mval *p)
+void CYGWIN64_ABI op_close(mval *v, mval *p)
 {
 	char		buf[MAX_TRANS_NAME_LEN];  /* buffer to hold translated name */
 	io_desc		*ciod;		/*  close io descriptor */

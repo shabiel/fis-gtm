@@ -99,7 +99,7 @@ error_def(ERR_STACKCRIT);
 /* Implementation note: $NAME does not edit check the result, such as if the key size exceeds the maximum for a global.
 * So, the result if used in other operations (such as SET, KILL) may generate run time errors (GVSUBOFLOW, etc)
 */
-void __attribute__ ((sysv_abi)) op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
+void CYGWIN64_ABI op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 {
 	int 		depth_count, fnname_type, len, space_needed;;
 	mval		*arg, *depth, *dst;

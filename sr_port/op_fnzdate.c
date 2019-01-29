@@ -52,7 +52,7 @@ error_def(ERR_ZDATEBADTIME);
 #define	SECONDS_PER_MINUTE	60
 #define	ZDATE_MAX_LEN		64
 
-void  __attribute__ ((sysv_abi)) op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
+void  CYGWIN64_ABI op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 {
 	unsigned char 	ch, *fmtptr, *fmttop, *i, *outptr, *outtop, *outpt1;
 	int 		cent, day, dow, month, nlen, outlen, time, year;

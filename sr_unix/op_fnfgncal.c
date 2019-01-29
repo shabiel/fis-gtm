@@ -692,7 +692,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	return;
 }
 
-void __attribute__ ((sysv_abi)) op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
+void CYGWIN64_ABI op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
 {
 	boolean_t	java = FALSE, save_in_ext_call, is_tpretry;
 	char		*free_string_pointer, *free_string_pointer_start;

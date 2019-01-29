@@ -68,7 +68,7 @@ error_def(ERR_MAXSTRLEN);
 	byte-oriented algorithm.
 ******************************************************************************/
 
-void  __attribute__ ((sysv_abi)) op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
+void  CYGWIN64_ABI op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 {
 	unsigned char	*inptr, *intop, *outptr, *outbase, *outtop, *dstbase, *nextptr, *chptr;
 	int4		xlate[256]; /* translation table to hold all single-byte character mappings */

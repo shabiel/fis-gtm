@@ -13,7 +13,7 @@
 #include "op.h"
 #include "mvalconv.h"
 
-void  __attribute__ ((sysv_abi)) op_fnzbitget(mval *dst, mval *bitstr, int pos)
+void  CYGWIN64_ABI op_fnzbitget(mval *dst, mval *bitstr, int pos)
 {
 	int 		str_len;
 	unsigned char	*byte_1, byte_n;

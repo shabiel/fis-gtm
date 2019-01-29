@@ -41,7 +41,7 @@ GBLREF spdesc 	stringpool;
  * 	dst	     - The destination string containing the converted string.
  * -----------------------------------------------
  */
-void  __attribute__ ((sysv_abi)) op_fnzcollate(mval *src, int col, int reverse, mval *dst)
+void  CYGWIN64_ABI op_fnzcollate(mval *src, int col, int reverse, mval *dst)
 {
 	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gv_key			*gvkey;

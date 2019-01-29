@@ -14,7 +14,7 @@
 #include "mdef.h"
 #include "op.h"
 
-void __attribute__ ((sysv_abi))  op_fnzfile(mval *name,mval *key,mval *ret)
+void CYGWIN64_ABI  op_fnzfile(mval *name,mval *key,mval *ret)
 {
 	assert (FALSE);
 }

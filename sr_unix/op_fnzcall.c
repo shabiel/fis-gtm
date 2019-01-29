@@ -14,4 +14,4 @@
 #include "mdef.h"
 #include "op.h"
 
-void  __attribute__ ((sysv_abi)) op_fnzcall() {assert (FALSE);}
+void  CYGWIN64_ABI op_fnzcall() {assert (FALSE);}

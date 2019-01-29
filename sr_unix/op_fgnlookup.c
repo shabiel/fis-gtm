@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "op.h"
 
-void __attribute__ ((sysv_abi)) op_fgnlookup(void)
+void CYGWIN64_ABI op_fgnlookup(void)
 {
 	error_def(ERR_UNIMPLOP);
 

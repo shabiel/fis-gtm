@@ -13,7 +13,7 @@
 #include "mvalconv.h"
 #include "op.h"
 
-void  __attribute__ ((sysv_abi)) op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos)
+void  CYGWIN64_ABI op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos)
 {
 	int str_len, find_bit;
 	unsigned char *byte_1, *byte_n, byte_0;

@@ -14,7 +14,7 @@
 
 GBLREF	int dollar_truth;
 
-int __attribute__ ((sysv_abi)) op_dt_get(void)
+int CYGWIN64_ABI op_dt_get(void)
 {
 	return dollar_truth;
 }

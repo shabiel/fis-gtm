@@ -14,6 +14,6 @@
 #include "mdef.h"
 #include "op.h"
 
-void  __attribute__ ((sysv_abi)) op_fnzlkid (mint boolex, mval *retval)
+void  CYGWIN64_ABI op_fnzlkid (mint boolex, mval *retval)
 {	assert(FALSE);
 }

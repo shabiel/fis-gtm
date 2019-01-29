@@ -46,7 +46,7 @@ GBLREF	boolean_t	gtm_utf8_mode;
 
 DBGUTFC_ONLY(STATICDEF uint4 findcnt;)
 
-int4 __attribute__ ((sysv_abi)) op_fnfind(mval *src, mval *del, mint first, mval *dst)
+int4 CYGWIN64_ABI op_fnfind(mval *src, mval *del, mint first, mval *dst)
 {
 	boolean_t		found_start, success;
 	char 			*match, *srcptr, *srctop;
@@ -135,7 +135,7 @@ int4 __attribute__ ((sysv_abi)) op_fnfind(mval *src, mval *del, mint first, mval
 #  include "utfcgr_trc.h"		/* Needed for op_fnzfind() DBGUTFC() macro below */
 #endif /* UNICODE_SUPPORTED */
 
-int4 __attribute__ ((sysv_abi)) op_fnzfind(mval *src, mval *del, mint first, mval *dst)
+int4 CYGWIN64_ABI op_fnzfind(mval *src, mval *del, mint first, mval *dst)
 {
 	mint	result;
 	char	*match;

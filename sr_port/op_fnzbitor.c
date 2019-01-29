@@ -18,7 +18,7 @@
 
 GBLREF spdesc stringpool;
 
-void  __attribute__ ((sysv_abi)) op_fnzbitor(mval *dst, mval *bitstr1, mval *bitstr2)
+void  CYGWIN64_ABI op_fnzbitor(mval *dst, mval *bitstr1, mval *bitstr2)
 {
 	bool short1;
 	int str_len1, str_len2;

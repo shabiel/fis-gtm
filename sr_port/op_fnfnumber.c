@@ -35,7 +35,7 @@ LITREF mval	literal_zero;
 error_def(ERR_FNARGINC);
 error_def(ERR_FNUMARG);
 
-void __attribute__ ((sysv_abi)) op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *dst)
+void CYGWIN64_ABI op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *dst)
 {
 	boolean_t	comma, paren;
 	int 		ct, x, xx, y, z;

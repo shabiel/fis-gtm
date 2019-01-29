@@ -40,7 +40,7 @@ DBGTRIGR_ONLY(GBLREF	unsigned int	t_tries;)
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLMODULE);
 
-void  __attribute__ ((sysv_abi)) op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
+void  CYGWIN64_ABI op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 /* label contains label to be located or null string */
 /* int_exp contains label offset or line number to reference */
 /* ret is used to return the correct string to caller */
