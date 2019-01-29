@@ -42,7 +42,7 @@ error_def(ERR_REC2BIG);
 
 void put_var(mval *var);
 
-void op_gvput(mval *var)
+void CYGWIN64_ABI op_gvput(mval *var)
 {
 	gd_region	*save_reg;
 	int		temp;

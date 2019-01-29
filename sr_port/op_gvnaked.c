@@ -53,9 +53,9 @@ GBLREF	uint4		dollar_tlevel;
 error_def(ERR_GVNAKED);
 error_def(ERR_MAXNRSUBSCRIPTS);
 
-STATICFNDCL void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list var);
+STATICFNDCL CYGWIN64_ABI void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list var);
 
-void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
+void CYGWIN64_ABI op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 {
 	va_list		var;
 	VMS_ONLY(int	count;)
@@ -67,7 +67,7 @@ void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 }
 
 /* See comment in "gvn.c" (search for OC_GVNAKED) for why hash_code_dummy is needed */
-void op_gvnaked_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code_dummy, mval *val_arg, ...)
+void CYGWIN64_ABI op_gvnaked_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code_dummy, mval *val_arg, ...)
 {
 	va_list		var;
 	VMS_ONLY(int	count;)
@@ -78,7 +78,7 @@ void op_gvnaked_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code_dummy, mval *v
 	va_end(var);
 }
 
-STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list var)
+STATICFNDEF CYGWIN64_ABI void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list var)
 {
 	boolean_t	was_null, is_null, sbs_cnt;
 	mval		*val;

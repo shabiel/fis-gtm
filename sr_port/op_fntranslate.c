@@ -221,7 +221,7 @@ void  CYGWIN64_ABI op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *
 /* $ZTRANSLATE() is implemented using a byte-indexed translation table xlate[256] which stores the
  * replacement character (byte) for a given character (byte) of the second argument specified in $TR().
  */
-void op_fnztranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
+void CYGWIN64_ABI op_fnztranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 {
 	int		n, xlate[256];
 	unsigned char	ch, *inpt, *intop, *outpt, *dstp;

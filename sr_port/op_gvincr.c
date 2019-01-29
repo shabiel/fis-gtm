@@ -36,7 +36,7 @@ error_def(ERR_PCTYRESERVED);
 error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 
-void	op_gvincr(mval *increment, mval *result)
+void CYGWIN64_ABI	op_gvincr(mval *increment, mval *result)
 {
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 	DCL_THREADGBL_ACCESS;

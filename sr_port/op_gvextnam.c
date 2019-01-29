@@ -49,9 +49,9 @@ GBLREF mval		dollar_zgbldir;
 GBLREF gd_addr		*gd_header;
 GBLREF gd_region	*gv_cur_region;
 
-STATICFNDCL void op_gvextnam_common(int count, int hash_code, mval *val1, va_list var);
+STATICFNDCL void CYGWIN64_ABI op_gvextnam_common(int count, int hash_code, mval *val1, va_list var);
 
-void op_gvextnam(UNIX_ONLY_COMMA(int count_arg) mval *val1, ...)
+void CYGWIN64_ABI op_gvextnam(UNIX_ONLY_COMMA(int count_arg) mval *val1, ...)
 {
 	int	 hash_code;
 	mval	*val2, *gblname_mval;
@@ -69,7 +69,7 @@ void op_gvextnam(UNIX_ONLY_COMMA(int count_arg) mval *val1, ...)
 	va_end(var_dup);
 }
 
-void op_gvextnam_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val1, ...)
+void CYGWIN64_ABI op_gvextnam_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val1, ...)
 {
 	va_list		var;
 	VMS_ONLY(int	count;)
@@ -80,7 +80,7 @@ void op_gvextnam_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val1, 
 	va_end(var);
 }
 
-STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_list var)
+STATICFNDEF void CYGWIN64_ABI op_gvextnam_common(int count, int hash_code, mval *val1, va_list var)
 {
 	boolean_t	was_null, is_null;
 	mstr		*tmp_mstr_ptr;

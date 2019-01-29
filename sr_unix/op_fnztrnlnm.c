@@ -53,7 +53,7 @@ static readonly unsigned char trnitm_index[] =
 	6, 7, 7, 7, 7, 7, 7, 10, 10, 11, 11, 11, 11
 };
 
-void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret)
+void CYGWIN64_ABI op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret)
 {
 	char		buf[MAX_TRANS_NAME_LEN];
 	char		*status;

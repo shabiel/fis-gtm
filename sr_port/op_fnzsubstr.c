@@ -15,7 +15,7 @@
 
 GBLREF	boolean_t	badchar_inhibit;
 
-void op_fnzsubstr(mval* src, int first, int byte_width, mval* dest)
+void CYGWIN64_ABI op_fnzsubstr(mval* src, int first, int byte_width, mval* dest)
 {
 	char		*srcbase, *srctop, *srcptr, *tmpptr;
 	int		bytelen, skip;

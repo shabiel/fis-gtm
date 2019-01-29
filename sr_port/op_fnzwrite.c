@@ -19,7 +19,7 @@
 error_def(ERR_MAXSTRLEN);
 
 /* Routine to return a string in zwrite format */
-void op_fnzwrite(boolean_t direction, mval* src, mval* dst)
+void CYGWIN64_ABI op_fnzwrite(boolean_t direction, mval* src, mval* dst)
 {
 	boolean_t	ok;
 	int		dst_len, str_len;

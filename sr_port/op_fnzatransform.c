@@ -82,7 +82,7 @@ CONDITION_HANDLER(op_fnzatransform_ch)
  * 	dst	 - The destination string containing the converted string.
  * -----------------------------------------------
  */
-void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
+void CYGWIN64_ABI op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 {
 	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gv_key		*gvkey;

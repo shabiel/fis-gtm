@@ -53,7 +53,7 @@ GBLREF mstr             extnam_str;
  * cached in TREF(sapi_query_node_subs) with the count of valid entries in TREF(sapi_query_node_subs_cnt) while a
  * YDB runtime call returns a string in the dst mval.
  */
-void op_gvreversequery(mval *v)
+void CYGWIN64_ABI op_gvreversequery(mval *v)
 {
 	int4			size;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, *glob_begin;

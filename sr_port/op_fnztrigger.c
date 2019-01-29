@@ -150,7 +150,7 @@ CONDITION_HANDLER(op_fnztrigger_ch)
 
 }
 
-void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
+void CYGWIN64_ABI op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 {
 	int				inparm_len, index;
 	uint4				filename_len;

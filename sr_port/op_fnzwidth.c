@@ -26,7 +26,7 @@ GBLREF	boolean_t	gtm_utf8_mode;
 GBLREF	uint4		*pattern_typemask;
 
 /* Routine to compute the display width of a string */
-void op_fnzwidth(mval* src, mval* dst)
+void CYGWIN64_ABI op_fnzwidth(mval* src, mval* dst)
 {
 	unsigned char	*srctop, *srcptr, *nextptr;
 	int 		width;

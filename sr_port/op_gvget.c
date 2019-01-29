@@ -39,7 +39,7 @@ LITREF	mval		literal_null;
  * the status of the get, though they don't want to cause any
  * errors.
  */
-boolean_t op_gvget(mval *v)
+boolean_t CYGWIN64_ABI op_gvget(mval *v)
 {
 	boolean_t	 gotit;
 	DCL_THREADGBL_ACCESS;

@@ -21,7 +21,7 @@
 
 LITREF mval literal_one;
 
-void op_fnzsyslog(mval* src, mval* dst)
+void CYGWIN64_ABI op_fnzsyslog(mval* src, mval* dst)
 {
 	char		rebuff[OUT_BUFF_SIZE];
 	int		len;

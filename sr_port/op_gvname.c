@@ -53,9 +53,9 @@ GBLREF uint4		dollar_tlevel;
 GBLREF mstr		extnam_str;
 GBLREF gd_region	*gv_cur_region;
 
-STATICFNDCL void op_gvname_common(int count, int hash_code, mval *val_arg, va_list var);
+STATICFNDCL void CYGWIN64_ABI op_gvname_common(int count, int hash_code, mval *val_arg, va_list var);
 
-void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
+void CYGWIN64_ABI op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 {
 	int	 	hash_code;
 	mval		tmpval;
@@ -71,7 +71,7 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	va_end(var);
 }
 
-void op_gvname_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg, ...)
+void CYGWIN64_ABI op_gvname_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg, ...)
 {
 	va_list		var;
 	VMS_ONLY(int	count;)
@@ -82,7 +82,7 @@ void op_gvname_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg,
 	va_end(var);
 }
 
-STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_list var)
+STATICFNDEF void CYGWIN64_ABI op_gvname_common(int count, int hash_code, mval *val_arg, va_list var)
 {
 	boolean_t	was_null, is_null;
 	boolean_t	bgormm;

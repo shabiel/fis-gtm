@@ -34,7 +34,7 @@ GBLREF spdesc		stringpool;
 #define MAX_NUM_SLEN		128
 /*************************************************************************/
 
-void op_gvnext(mval *v)
+void CYGWIN64_ABI op_gvnext(mval *v)
 {
 	boolean_t		found;
 	enum db_acc_method 	acc_meth;

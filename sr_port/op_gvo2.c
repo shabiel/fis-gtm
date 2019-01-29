@@ -15,7 +15,7 @@
 
 error_def(ERR_ORDER2);
 
-void op_gvo2(mval *dst,mval *direct)
+void CYGWIN64_ABI op_gvo2(mval *dst,mval *direct)
 {
 	int4	dummy_intval;
 

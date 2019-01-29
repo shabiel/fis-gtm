@@ -51,7 +51,7 @@ error_def(ERR_PCTYRESERVED);
 
 void kill_var(void);
 
-void op_gvkill(void)
+void CYGWIN64_ABI op_gvkill(void)
 {
 	gd_region	*reg;
 	gvnh_reg_t	*gvnh_reg;

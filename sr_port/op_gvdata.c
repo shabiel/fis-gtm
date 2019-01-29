@@ -28,7 +28,7 @@ GBLREF gv_key		*gv_currkey;
 
 LITREF mval		*fndata_table[2][2];
 
-void op_gvdata(mval *v)
+void CYGWIN64_ABI op_gvdata(mval *v)
 {
 	mint			x;
 	gvnh_reg_t		*gvnh_reg;

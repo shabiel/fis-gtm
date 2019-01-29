@@ -133,17 +133,16 @@ void CYGWIN64_ABI	op_fnzsyslog(mval *src, mval *dst);
 void CYGWIN64_ABI	op_fnztranslate(mval *src, mval *in_str , mval *out_str, mval *dst);
 void CYGWIN64_ABI	op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst);
 void CYGWIN64_ABI	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret);
-void CYGWIN64_ABI	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret);
 void CYGWIN64_ABI	op_fnzwidth(mval *str, mval *dst);
 void CYGWIN64_ABI	op_fnzwrite(boolean_t direction, mval *str, mval *dst);
 void CYGWIN64_ABI	op_fnzatransform(mval *src, int col, int reverse, int forcenum, mval *dst);
-int CYGWIN64_ABI	op_forchk1();
-int CYGWIN64_ABI	op_forintrrpt();
-int CYGWIN64_ABI	op_forloop();
+int CYGWIN64_ABI	op_forchk1();    /* CYGWIN X64 NOTE: THIS IS ASSEMBLY! */
+int CYGWIN64_ABI	op_forintrrpt(); /* CYGWIN X64 NOTE: THIS IS ASSEMBLY! */
+int CYGWIN64_ABI	op_forloop();    /* CYGWIN X64 NOTE: THIS IS ASSEMBLY! */
 void CYGWIN64_ABI	op_gvdata(mval *v);
 void CYGWIN64_ABI	op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...);
 void CYGWIN64_ABI	op_gvextnam_fast(UNIX_ONLY_COMMA(int4 count) int hash_code, mval *val1, ...);
-boolean_t CYGWIN64_ABI op_gvget(mval *v);
+boolean_t CYGWIN64_ABI	op_gvget(mval *v);
 void CYGWIN64_ABI	op_gvincr(mval *increment, mval *result);
 void CYGWIN64_ABI	op_gvkill(void);
 void CYGWIN64_ABI	op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...);
