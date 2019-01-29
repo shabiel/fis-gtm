@@ -17,7 +17,7 @@
 GBLREF spdesc stringpool;
 #define MAX_MSG_SIZE 256
 
-void op_fnzm(mint x, mval *v)
+void  __attribute__ ((sysv_abi)) op_fnzm(mint x, mval *v)
 {
 	int4	l_x;
 	mstr	msg;

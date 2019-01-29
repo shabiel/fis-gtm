@@ -14,7 +14,7 @@
 #include "mdef.h"
 #include "op.h"
 
-void op_fnzpid(mint boolexpr,mval *ret)
+void __attribute__ ((sysv_abi))  op_fnzpid(mint boolexpr,mval *ret)
 {
 	assert (FALSE);
 }

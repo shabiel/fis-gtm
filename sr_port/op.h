@@ -46,7 +46,7 @@ void __attribute__ ((sysv_abi))	op_exfunretals(mval *retval);
 void __attribute__ ((sysv_abi))	op_exp(mval *u, mval *v, mval *p);
 /*	op_fetch currently does not exist. Instead gtm_fetch is the name (should be renamed to op_fetch to keep naming scheme) */
 void __attribute__ ((sysv_abi))	gtm_fetch(UNIX_ONLY_COMMA(unsigned int cnt_arg) unsigned int indxarg, ...);
-int	op_fetchintrrpt();
+int  __attribute__ ((sysv_abi))	op_fetchintrrpt(); /* CYGWIN X64 NOTE: This is assembly code */
 void __attribute__ ((sysv_abi))	op_fgnlookup(void);
 void __attribute__ ((sysv_abi))	op_fnascii(int4 num, mval *in, mval *out);
 void __attribute__ ((sysv_abi))	op_fnchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...);
@@ -104,7 +104,7 @@ void __attribute__ ((sysv_abi))	op_fnzcollate(mval *src, int col, int reverse, m
 void __attribute__ ((sysv_abi))	op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst);
 void __attribute__ ((sysv_abi))	op_fnzdebug(mval *cmd, mval *dst);
 void __attribute__ ((sysv_abi))	op_fnzechar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...);
-void __attribute__ ((sysv_abi))	op_fnzextract(int last, int first, mval *src, mval *dest);
+void __attribute__ ((sysv_abi))	op_fnzextract(int last, int first, mval *src, mval *dest); /* CYGWIN X64 NOTE: THIS IS ASSEMBLY! */
 void __attribute__ ((sysv_abi))	op_fnzfile(mval *name, mval *key, mval *ret);
 int4 __attribute__ ((sysv_abi))	op_fnzfind(mval *src, mval *del, mint first, mval *dst);
 void __attribute__ ((sysv_abi))	op_fnzj2(mval *src, int len, mval *dst);

@@ -13,7 +13,7 @@
 #include "op.h"
 #include "mvalconv.h"
 
-void op_fnzbitlen(mval *dst, mval *bitstr)
+void  __attribute__ ((sysv_abi)) op_fnzbitlen(mval *dst, mval *bitstr)
 {
 	int len, str_len;
 	unsigned char *byte_1;

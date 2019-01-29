@@ -14,4 +14,4 @@
 #include "mdef.h"
 #include "op.h"
 
-void op_fnzcall() {assert (FALSE);}
+void  __attribute__ ((sysv_abi)) op_fnzcall() {assert (FALSE);}

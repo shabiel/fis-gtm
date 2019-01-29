@@ -13,7 +13,7 @@
 #include "op.h"
 #include "mvalconv.h"
 
-void op_fnzbitcoun(mval *dst, mval *bitstr)
+void  __attribute__ ((sysv_abi)) op_fnzbitcoun(mval *dst, mval *bitstr)
 {
 	int str_len;
 	unsigned char *byte_1, *byte_n, byte_0;

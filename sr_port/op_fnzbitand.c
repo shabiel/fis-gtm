@@ -15,7 +15,7 @@
 
 GBLREF spdesc stringpool;
 
-void op_fnzbitand(mval *dst, mval *bitstr1, mval *bitstr2)
+void  __attribute__ ((sysv_abi)) op_fnzbitand(mval *dst, mval *bitstr1, mval *bitstr2)
 {
 	int 		n, str_len1, str_len2, new_str_len;
 	unsigned char	*byte_1, *byte_n;

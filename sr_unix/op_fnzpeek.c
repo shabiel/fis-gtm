@@ -442,7 +442,7 @@ STATICFNDEF boolean_t op_fnzpeek_attach_recvpool(void)
  * format   - Option format character - codes described below
  * ret	    - Return mval
  */
-void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
+void __attribute__ ((sysv_abi)) 	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 {
 	void			*zpeekadr;
 	UINTPTR_T		prmpeekadr = 0;

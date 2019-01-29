@@ -127,7 +127,7 @@ LITREF	mval		literal_one;
 	assert(stringpool.free <= stringpool.top);			\
 }
 
-void	op_fnview(int numarg, mval *dst, ...)
+void __attribute__ ((sysv_abi)) 	op_fnview(int numarg, mval *dst, ...)
 {	boolean_t	save_transform;
 	char		instfilename[MAX_FN_LEN + 1 + 1];	/* 1 for possible flag character */
 	collseq		*csp;

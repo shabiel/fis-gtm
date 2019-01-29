@@ -117,7 +117,7 @@ LITDEF char *zsocket_howcreated_names[] = {"LISTEN", "ACCEPTED", "CONNECT", "PRI
 		SOCKETPTR = NULL;					\
 }
 
-void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
+void __attribute__ ((sysv_abi)) 	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 {
 	VMS_ONLY(int	numarg;)
 	int		zsocket_item, zsocket_type, tmpnum, numret, index, index2;

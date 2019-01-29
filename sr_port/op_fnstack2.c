@@ -57,7 +57,7 @@ GBLREF	dollar_stack_type	dollar_stack;			/* structure containing $STACK related 
 	}										\
 }
 
-void op_fnstack2(int level, mval *info, mval *result)
+void  __attribute__ ((sysv_abi)) op_fnstack2(int level, mval *info, mval *result)
 {
  	int		cur_zlevel;
 	stack_mode_t	mode;

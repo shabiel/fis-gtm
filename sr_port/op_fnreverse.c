@@ -32,7 +32,7 @@ GBLREF spdesc stringpool;
 GBLREF	boolean_t	badchar_inhibit;
 
 /* Unicode character-oriented $REVERSE (for $ZCHSET="UTF-8") */
-void op_fnreverse(mval *src, mval *dst)
+void  __attribute__ ((sysv_abi)) op_fnreverse(mval *src, mval *dst)
 {
 	unsigned char	*srcptr, *srctop, *dstptr, *dsttop;
 	int		char_len, chlen;
@@ -73,7 +73,7 @@ void op_fnreverse(mval *src, mval *dst)
 #endif /* UNICODE_SUPPORTED */
 
 /* byte-oriented $REVERSE (for $ZCHSET="M") */
-void op_fnzreverse(mval *src, mval *dst)
+void __attribute__ ((sysv_abi))  op_fnzreverse(mval *src, mval *dst)
 {
 	int	lcnt;
 	char    *in, *out;

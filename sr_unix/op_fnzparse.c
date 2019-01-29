@@ -33,7 +33,7 @@
 #define NCON_LEN	10
 #define SYN_LEN		11
 
-void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, mval *ret)
+void __attribute__ ((sysv_abi)) 	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, mval *ret)
 {
 	char 		field_type;
 	uint4 		status;

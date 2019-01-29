@@ -14,7 +14,7 @@
 #include "mdef.h"
 #include "op.h"
 
-void op_fnzsetprv(mval *prv,mval *ret)
+void  __attribute__ ((sysv_abi)) op_fnzsetprv(mval *prv,mval *ret)
 {
 	assert (FALSE);
 }

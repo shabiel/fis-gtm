@@ -35,7 +35,7 @@
 #include "min_max.h"
 #include "op.h"
 
-void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
+void  __attribute__ ((sysv_abi)) op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 {
 	unsigned char	*first, *last, *start, *end;
 	unsigned char	dlmc;

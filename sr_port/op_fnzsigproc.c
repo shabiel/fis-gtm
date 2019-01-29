@@ -25,7 +25,7 @@
 #include "mvalconv.h"
 #include "op.h"
 
-void op_fnzsigproc(int pid, int signum, mval *retcode)
+void  __attribute__ ((sysv_abi)) op_fnzsigproc(int pid, int signum, mval *retcode)
 {
 	int	rc;
 

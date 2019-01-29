@@ -18,7 +18,7 @@
 
 GBLREF spdesc	stringpool;
 
-void op_fnzbitstr(mval *bitstr, int size, int truthval)
+void  __attribute__ ((sysv_abi)) op_fnzbitstr(mval *bitstr, int size, int truthval)
 {
 	unsigned char 	*byte_1, *byte_n;
 	static const unsigned char mask[8]={0xFF,0xFE,0xFC,0xF8,0xF0,0xE0,0xC0,0x80};

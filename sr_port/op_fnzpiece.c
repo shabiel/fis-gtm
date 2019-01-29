@@ -46,7 +46,7 @@ GBLREF	boolean_t	gtm_utf8_mode;
  *	none
  * -----------------------------------------------
  */
-void op_fnzpiece(mval *src, mval *del, int first, int last, mval *dst)
+void  __attribute__ ((sysv_abi)) op_fnzpiece(mval *src, mval *del, int first, int last, mval *dst)
 {
 	int		piece_cnt, del_len, src_len;
 	char		*del_str, *src_str;

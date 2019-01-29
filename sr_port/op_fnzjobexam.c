@@ -13,7 +13,7 @@
 #include "op.h"
 #include "jobexam_process.h"
 
-void op_fnzjobexam(mval *prelimSpec, mval *finalSpec)
+void  __attribute__ ((sysv_abi)) op_fnzjobexam(mval *prelimSpec, mval *finalSpec)
 {
 	MV_FORCE_STR(prelimSpec);
 	jobexam_process(prelimSpec, finalSpec);
