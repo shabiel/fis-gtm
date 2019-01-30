@@ -31,7 +31,7 @@ GBLREF io_pair		io_std_device;		/* standard device	*/
 GBLREF io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if defined */
 GBLREF bool		prin_in_dev_failure;
 GBLREF bool		prin_out_dev_failure;
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, const mval *t, mval *mspace);
+GBLREF CYGWIN64_ABI int		(*op_open_ptr)(mval *v, mval *p, const mval *t, mval *mspace);
 
 GBLREF io_log_name	*io_root_log_name;	/* root of linked list	*/
 GBLREF mstr		sys_input;

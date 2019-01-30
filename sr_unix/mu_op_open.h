@@ -13,6 +13,6 @@
 #ifndef MU_OP_OPEN_INCLUDED
 #define MU_OP_OPEN_INCLUDED
 
-int mu_op_open(mval *v, mval *p, mval *t, mval *mspace);
+int CYGWIN64_ABI  mu_op_open(mval *v, mval *p, mval *t, mval *mspace);
 
 #endif /* MU_OP_OPEN_INCLUDED */

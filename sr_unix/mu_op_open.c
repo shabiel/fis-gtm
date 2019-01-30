@@ -62,7 +62,7 @@ LITREF	unsigned char		io_params_size[];
 static boolean_t mu_open_try(io_log_name *, io_log_name *, mval *, mval *);
 
 /*	The third parameter is dummy to keep the inteface same as op_open	*/
-int mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
+int CYGWIN64_ABI mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
 {
 	char		buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
 	int4		stat;		/* status */
