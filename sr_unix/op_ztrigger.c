@@ -108,12 +108,12 @@ error_def(ERR_ZTRIGNOTRW);
 #ifndef GTM_TRIGGER
 error_def(ERR_UNIMPLOP);
 
-void op_ztrigger(void)
+void CYGWIN64_ABI op_ztrigger(void)
 {
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 }
 #else
-void op_ztrigger(void)
+void CYGWIN64_ABI op_ztrigger(void)
 {
 	node_local_ptr_t		cnl;
 	sgmnt_addrs			*csa;

@@ -50,7 +50,7 @@ GBLREF uint4		dollar_tlevel;
  *    orphaned data will be recovered by the next LVGC.
  * 3) Go through the list of HTEs recorded in step one and kill their hash table reference.
  */
-void op_killaliasall(void)
+void CYGWIN64_ABI  op_killaliasall(void)
 {
 	ht_ent_mname    *tabent, *tabent_top;
 	lv_val		*lvp, *lvp_top, *lvrefp;

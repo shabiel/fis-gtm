@@ -69,7 +69,7 @@ error_def(ERR_UNIMPLOP);
 error_def(ERR_TEXT);
 error_def(ERR_GVIS);
 
-void op_merge_arg(int m_opr_type, lv_val *lvp)
+void CYGWIN64_ABI op_merge_arg(int m_opr_type, lv_val *lvp)
 {
 	int 			maxkeysz;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;

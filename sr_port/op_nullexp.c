@@ -14,7 +14,7 @@
 
 LITREF mval skiparg;
 
-mval *op_nullexp(void)
+mval CYGWIN64_ABI *op_nullexp(void)
 {
 	return (mval *)&skiparg;
 }

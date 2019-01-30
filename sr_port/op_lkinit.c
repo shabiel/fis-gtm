@@ -20,7 +20,7 @@ GBLREF unsigned short	lks_this_cmd;
 
 error_def(ERR_BADLOCKNEST);
 
-void op_lkinit(void)
+void CYGWIN64_ABI op_lkinit(void)
 {
 	if (lks_this_cmd)
 	{

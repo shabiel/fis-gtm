@@ -61,7 +61,7 @@ error_def(ERR_STACKUNDERFLO);
 error_def(ERR_TPQUIT);
 
 /* This has to be maintained in parallel with unw_retarg(), the unwind with a return argument (extrinisic quit) routine. */
-void op_unwind(void)
+void CYGWIN64_ABI op_unwind(void)
 {
 	rhdtyp			*rtnhdr;
 	mv_stent 		*mvc;

@@ -21,7 +21,7 @@
 
 GBLREF int	source_column;
 
-void	op_indpat(mval *v, mval *dst)
+void CYGWIN64_ABI 	op_indpat(mval *v, mval *dst)
 {
 	int		rval;
 	icode_str	indir_src;

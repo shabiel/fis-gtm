@@ -42,7 +42,7 @@ error_def(ERR_TPLOCK);
  * -----------------------------------------------
  */
 
-void op_zdealloc2(mval *timeout, UINTPTR_T auxown)
+void CYGWIN64_ABI op_zdealloc2(mval *timeout, UINTPTR_T auxown)
 {
 	unsigned short	count;
 	mlk_pvtblk	**prior;

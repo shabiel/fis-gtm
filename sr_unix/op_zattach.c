@@ -15,7 +15,7 @@
 #include "io.h"
 #include "op.h"
 
-void op_zattach(mval *v)
+void CYGWIN64_ABI op_zattach(mval *v)
 {	error_def(ERR_UNIMPLOP);
 	rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
 }

@@ -17,7 +17,7 @@
 GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
 
-void op_wtff(void)
+void CYGWIN64_ABI op_wtff(void)
 {
 	active_device = io_curr_device.out;
 	(io_curr_device.out->disp_ptr->wtff)();

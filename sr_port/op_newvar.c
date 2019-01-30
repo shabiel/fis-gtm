@@ -43,7 +43,7 @@ error_def(ERR_STACKCRIT);
 /* Note this module follows the same basic pattern as gtm_newintrisic which handles
  * the same function but for intrinsic vars instead of local vars.
  */
-void op_newvar(uint4 arg1)
+void CYGWIN64_ABI op_newvar(uint4 arg1)
 {
 	mv_stent 	*mv_st_ent, *mvst_tmp, *mvst_prev;
 	ht_ent_mname	*tabent;

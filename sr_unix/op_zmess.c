@@ -72,7 +72,7 @@ STATICFNDEF boolean_t is_disallowed(unsigned int errnum)
 	return FALSE;
 }
 
-void op_zmess(unsigned int cnt, ...)
+void CYGWIN64_ABI op_zmess(unsigned int cnt, ...)
 {
 	va_list		var;
 	const err_ctl	*ectl;

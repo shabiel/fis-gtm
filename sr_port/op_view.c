@@ -160,7 +160,7 @@ error_def(ERR_ACK);
 			gvnh->gvname.var_name.addr, gvnh->noisolation, status);					\
 }
 
-void	op_view(int numarg, mval *keyword, ...)
+void CYGWIN64_ABI	op_view(int numarg, mval *keyword, ...)
 {
 	boolean_t		dbgdmpenabled, found_reg, old_bool, was_crit, was_skip_gtm_putmsg;
 	char			*chptr, label_type[SIZEOF("lower") - 1];

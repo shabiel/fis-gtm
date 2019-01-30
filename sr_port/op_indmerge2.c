@@ -34,7 +34,7 @@
 #include "gvname_info.h"
 #include "op_merge.h"
 
-void op_indmerge2(uint4 indx)
+void CYGWIN64_ABI  op_indmerge2(uint4 indx)
 {
 	lv_val		*lv;
 	opctype		oc;

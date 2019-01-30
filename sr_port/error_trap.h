@@ -150,7 +150,7 @@ void		ecode_init(void);
 void		ecode_get(int level, mval *result);	/* return $ECODE (if "level" < 0) or $STACK(level,"ECODE") in "result" */
 void		ecode_set(int errnum);			/* convert "errnum" to error-string and call ecode_add() */
 boolean_t	ecode_add(mstr *str);			/* add "str" to $ECODE */
-void		error_return(void);
+void	CYGWIN64_ABI 	error_return(void);
 #ifdef VMS
 void		error_return_vms(void);
 #endif

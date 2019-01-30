@@ -28,7 +28,7 @@
 #include "mvalconv.h"
 #include "gtm_maxstr.h"
 
-void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
+void CYGWIN64_ABI  op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 {
 	va_list		var;
 	bool		flag;

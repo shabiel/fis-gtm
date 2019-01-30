@@ -22,7 +22,7 @@
 
 error_def(ERR_VAREXPECTED);
 
-void	op_indfnname(mval *dst, mval *target, mval *depth)
+void CYGWIN64_ABI 	op_indfnname(mval *dst, mval *target, mval *depth)
 {
 	boolean_t	gbl;
 	icode_str	indir_src;

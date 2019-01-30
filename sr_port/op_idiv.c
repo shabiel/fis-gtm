@@ -24,7 +24,7 @@ LITREF mval	literal_zero;
 
 error_def(ERR_NUMOFLOW);
 
-void	op_idiv(mval *u, mval *v, mval *q)
+void CYGWIN64_ABI 	op_idiv(mval *u, mval *v, mval *q)
 {
 	bool		promo;
 	int4		z, c, exp;

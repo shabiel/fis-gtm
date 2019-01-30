@@ -126,8 +126,8 @@ int CYGWIN64_ABI	op_fnzsearch(mval *file, mint indx, mint mfunc, mval *ret);		/*
 void CYGWIN64_ABI	op_fnzsetprv(mval *prv, mval *ret);
 void CYGWIN64_ABI	op_fnzsigproc(int processid, int signum, mval *retcode);
 void CYGWIN64_ABI	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...);
-void CYGWIN64_ABI	op_fnzsqlexpr(mval *value, mval *target);
-void CYGWIN64_ABI	op_fnzsqlfield(int findex, mval *target);
+void CYGWIN64_ABI	op_fnzsqlexpr(mval *value, mval *target); /* does not exist */
+void CYGWIN64_ABI	op_fnzsqlfield(int findex, mval *target); /* does not exist */
 void CYGWIN64_ABI	op_fnzsubstr(mval *src, int start, int bytelen, mval *dest);
 void CYGWIN64_ABI	op_fnzsyslog(mval *src, mval *dst);
 void CYGWIN64_ABI	op_fnztranslate(mval *src, mval *in_str , mval *out_str, mval *dst);
@@ -193,9 +193,8 @@ void CYGWIN64_ABI	op_iretmval(mval *v, mval *dst);
 int CYGWIN64_ABI	op_job(int4 argcnt, ...);
 void CYGWIN64_ABI	op_killaliasall(void);
 void CYGWIN64_ABI	op_killall(void);
-void CYGWIN64_ABI	op_killall(void);
-int CYGWIN64_ABI	op_linefetch();
-int CYGWIN64_ABI	op_linestart();
+int CYGWIN64_ABI	op_linefetch(); /* ASSEMBLY */
+int CYGWIN64_ABI	op_linestart(); /* ASSEMBLY */
 void CYGWIN64_ABI	op_litc(mval *dst, mval *src);
 void CYGWIN64_ABI	op_lkinit(void);
 void CYGWIN64_ABI	op_lkname(UNIX_ONLY_COMMA(int subcnt) mval *extgbl1, ...);
@@ -205,9 +204,9 @@ void CYGWIN64_ABI	op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 void CYGWIN64_ABI	op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...);
 /*	op_merge     : prototype defined separately in op_merge.h */
 /*	op_merge_arg : prototype defined separately in op_merge.h */
-int CYGWIN64_ABI	op_mprofforchk1();
-int CYGWIN64_ABI	op_mproflinefetch();
-int CYGWIN64_ABI	op_mproflinestart();
+int CYGWIN64_ABI	op_mprofforchk1();   /* ASSEMBLY */
+int CYGWIN64_ABI	op_mproflinefetch(); /* ASSEMBLY */
+int CYGWIN64_ABI	op_mproflinestart(); /* ASSEMBLY */
 void CYGWIN64_ABI	op_mul(mval *u, mval *v, mval *p);
 void CYGWIN64_ABI	op_newintrinsic(int intrtype);
 void CYGWIN64_ABI	op_newvar(uint4 arg1);
@@ -218,8 +217,8 @@ int CYGWIN64_ABI	op_open_dummy(mval *v, mval *p, mval *timeout, mval *mspace);
 int CYGWIN64_ABI	op_rdone(mval *v, mval *timeout);
 int CYGWIN64_ABI	op_read(mval *v, mval *timeout);
 int CYGWIN64_ABI	op_readfl(mval *v, int4 length, mval *timeout);
-int CYGWIN64_ABI	op_ret();
-int CYGWIN64_ABI	op_retarg();
+int CYGWIN64_ABI	op_ret(); /* does not exist */
+int CYGWIN64_ABI	op_retarg(); /*ASSEMBLY*/
 void CYGWIN64_ABI	op_rterror(int4 sig, boolean_t subrtn);
 void CYGWIN64_ABI	op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst);
 void CYGWIN64_ABI	op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst);
@@ -228,10 +227,9 @@ void CYGWIN64_ABI	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cn
 void CYGWIN64_ABI	op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst);
 void CYGWIN64_ABI	op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst);
 void CYGWIN64_ABI	op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst);
-void CYGWIN64_ABI	op_sqlinddo(mstr *m_init_rtn);
-int CYGWIN64_ABI	op_startintrrpt();
+void CYGWIN64_ABI	op_sqlinddo(mstr *m_init_rtn); /* does not exist */
+int CYGWIN64_ABI	op_startintrrpt(); /*ASSEMBLY*/
 void CYGWIN64_ABI	op_stolitc(mval *val);
-void CYGWIN64_ABI	op_sub(mval *u, mval *v, mval *s);
 void CYGWIN64_ABI	op_sub(mval *u, mval *v, mval *s);
 void CYGWIN64_ABI	op_svget(int varnum, mval *v);
 void CYGWIN64_ABI	op_svput(int varnum, mval *v);
@@ -267,11 +265,11 @@ void CYGWIN64_ABI	op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...);
 void CYGWIN64_ABI	op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...);
 int CYGWIN64_ABI	op_zallocate(mval *timeout);
 void CYGWIN64_ABI	op_zattach(mval *);
-int CYGWIN64_ABI	op_zbfetch();
-int CYGWIN64_ABI	op_zbstart();
+int CYGWIN64_ABI	op_zbfetch(); /* ASSEMBLY */
+int CYGWIN64_ABI	op_zbstart(); /* ASSEMBLY */
 void CYGWIN64_ABI	op_zcompile(mval *v, boolean_t ignore_dollar_zcompile);
 void CYGWIN64_ABI	op_zcont(void);
-void CYGWIN64_ABI    op_zcollate(mval *v, int c, mval *p);
+void CYGWIN64_ABI    op_zcollate(mval *v, int c, mval *p); /* does not exist */
 void CYGWIN64_ABI	op_zdealloc2(mval *timeout, UINTPTR_T auxown);
 void CYGWIN64_ABI	op_zdeallocate(mval *timeout);
 void CYGWIN64_ABI	op_zedit(mval *v, mval *p);
@@ -287,25 +285,25 @@ void CYGWIN64_ABI	op_zmess(unsigned int cnt, ...);
 void CYGWIN64_ABI	op_zprevious(mval *v);
 void CYGWIN64_ABI	op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label, int end_int_exp);
 void CYGWIN64_ABI	op_zst_break(void);
-int CYGWIN64_ABI	op_zst_fet_over();
+int CYGWIN64_ABI	op_zst_fet_over(); /* ASSEMBLY */
 void CYGWIN64_ABI	op_zst_over(void);
-int CYGWIN64_ABI	op_zst_st_over();
+int CYGWIN64_ABI	op_zst_st_over(); /* ASSEMBLY */
 void CYGWIN64_ABI	op_zstep(uint4 code, mval *action);
-int CYGWIN64_ABI	op_zstepfetch();
+int CYGWIN64_ABI	op_zstepfetch(); /* ASSEMBLY */
 void CYGWIN64_ABI	op_zstepret(void);
-int CYGWIN64_ABI	op_zstepstart();
-int CYGWIN64_ABI	op_zstzb_fet_over();
-int CYGWIN64_ABI	op_zstzb_st_over();
-int CYGWIN64_ABI	op_zstzbfetch();
-int CYGWIN64_ABI	op_zstzbstart();
+int CYGWIN64_ABI	op_zstepstart(); /* ASSEMBLY */
+int CYGWIN64_ABI	op_zstzb_fet_over(); /* ASSEMBLY */
+int CYGWIN64_ABI	op_zstzb_st_over(); /* ASSEMBLY */
+int CYGWIN64_ABI	op_zstzbfetch(); /* ASSEMBLY */
+int CYGWIN64_ABI	op_zstzbstart(); /* ASSEMBLY */
 void CYGWIN64_ABI	op_zsystem(mval *v);
 void CYGWIN64_ABI	op_ztcommit(int4 n);
 void CYGWIN64_ABI	op_ztstart(void);
-int CYGWIN64_ABI	opp_ret();
-int CYGWIN64_ABI	opp_zst_over_ret();
-int CYGWIN64_ABI	opp_zst_over_retarg();
-int CYGWIN64_ABI	opp_zstepret();
-int CYGWIN64_ABI	opp_zstepretarg();
+int CYGWIN64_ABI	opp_ret(); /* ASSEMBLY */
+int CYGWIN64_ABI	opp_zst_over_ret(); /* ASSEMBLY */
+int CYGWIN64_ABI	opp_zst_over_retarg(); /* ASSEMBLY */
+int CYGWIN64_ABI	opp_zstepret(); /* ASSEMBLY */
+int CYGWIN64_ABI	opp_zstepretarg(); /* ASSEMBLY */
 void CYGWIN64_ABI	op_zut(mval *s);
 void CYGWIN64_ABI	op_zwritesvn(int svn);
 void CYGWIN64_ABI	op_zst_over_retarg_helper(void);

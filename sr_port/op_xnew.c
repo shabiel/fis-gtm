@@ -57,7 +57,7 @@ CONDITION_HANDLER(zbreak_zstep_xnew_ch);
  *	 in umw_mv_stent().
  */
 
-void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
+void CYGWIN64_ABI op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 {
 	boolean_t		added;
 	ht_ent_mname		*tabent1, *tabent2;

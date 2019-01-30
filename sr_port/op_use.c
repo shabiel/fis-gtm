@@ -31,7 +31,7 @@ GBLREF mstr	dollar_zpout;			/* contains "> /" */
 
 error_def(ERR_IONOTOPEN);
 
-void op_use(mval *v, mval *p)
+void CYGWIN64_ABI op_use(mval *v, mval *p)
 {
 	char		buf1[MAX_TRANS_NAME_LEN];  /* buffer to hold translated name */
 	io_log_name	*nl;		/* logical record for passed name */

@@ -21,7 +21,7 @@
 #include "mdef.h"
 #include "op.h"
 
-void op_zdeallocate (mval *timeout)
+void CYGWIN64_ABI op_zdeallocate (mval *timeout)
 {
 	op_zdealloc2(timeout, 0);
 	return;

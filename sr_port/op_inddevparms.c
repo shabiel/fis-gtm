@@ -23,7 +23,7 @@
 
 error_def(ERR_INDEXTRACHARS);
 
-void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms,  mval *devpiopl)
+void CYGWIN64_ABI 	op_inddevparms(mval *devpsrc, int4 ok_iop_parms,  mval *devpiopl)
 {
 	int	rval;
 	icode_str	indir_src;

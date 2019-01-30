@@ -75,7 +75,7 @@ int rts_error_va(void *csa, int argcnt, va_list var);
  * ----------------------------------------------------------------------------------------
  */
 /* coverity[+kill] */
-int rts_error(int argcnt, ...)
+int CYGWIN64_ABI rts_error(int argcnt, ...)
 {
 	va_list		var;
 	sgmnt_addrs	*csa;

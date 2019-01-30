@@ -52,7 +52,7 @@ GBLREF spdesc		stringpool;
 
 error_def(ERR_TEXT);
 
-int op_read(mval *v, mval *timeout)
+int CYGWIN64_ABI op_read(mval *v, mval *timeout)
 {
 	char		*save_ptr, *start_ptr;
 	int		stat;

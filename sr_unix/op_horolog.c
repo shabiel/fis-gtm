@@ -20,7 +20,7 @@
 GBLREF spdesc	stringpool;
 
 /* If you update this function, consider updating op_zhorolog() as well, however at this writing they use different services */
-void op_horolog(mval *s)
+void CYGWIN64_ABI  op_horolog(mval *s)
 {
 	uint4		days;
 	time_t		seconds;

@@ -30,7 +30,7 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
 LITREF mval		literal_null;
 
-boolean_t op_gvqueryget(mval *key, mval *val)
+boolean_t CYGWIN64_ABI  op_gvqueryget(mval *key, mval *val)
 {
 	boolean_t 	gotit;
 	gv_key		*save_key;

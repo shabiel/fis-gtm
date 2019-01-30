@@ -41,7 +41,7 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	sgmnt_data	*cs_data;
 GBLREF	uint4		dollar_tlevel;
 
-void op_gvrectarg(mval *v)
+void CYGWIN64_ABI  op_gvrectarg(mval *v)
 {
 	int			len;
 	unsigned char		*c;

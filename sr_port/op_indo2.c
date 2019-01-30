@@ -27,7 +27,7 @@ error_def(ERR_VAREXPECTED);
 LITREF	mval	literal_one;
 LITREF	mval	literal_minusone;
 
-void	op_indo2(mval *dst, uint4 indx, mval *direct)
+void CYGWIN64_ABI 	op_indo2(mval *dst, uint4 indx, mval *direct)
 {
 	glvn_pool_entry	*slot;
 	int4		dummy_intval;

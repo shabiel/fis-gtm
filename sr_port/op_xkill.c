@@ -32,7 +32,7 @@ GBLREF symval		*curr_symval;
 GBLREF uint4		lvtaskcycle;
 GBLREF boolean_t	ydb_stdxkill;
 
-void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
+void CYGWIN64_ABI op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 {
 	va_list		var;
 	VMS_ONLY(int	n;)

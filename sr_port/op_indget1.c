@@ -36,7 +36,7 @@
 LITREF	mval			literal_null;
 
 /* [Used by SET] Get the value of a saved local or global variable. Return literal_null by default. */
-void op_indget1(uint4 indx, mval *dst)
+void CYGWIN64_ABI  op_indget1(uint4 indx, mval *dst)
 {
 	lv_val		*lv;
 	opctype		oc;

@@ -36,7 +36,7 @@ GBLREF	uint4		dollar_tlevel;
 /* Sets t_fail_hist[t_tries] to cdb_sc_optrestart to indicate an explicit TP restart was requested by the user. Before doing
  * so, it checks if we are in the final retry and issues another error if the explicit restart is requested more than once.
  */
-void	op_trestart_set_cdb_code(void)
+void CYGWIN64_ABI	op_trestart_set_cdb_code(void)
 {
 	static	trans_num	trestart_final_retry_local_tn;
 	static	uint4		trestart_final_retry_cnt;
@@ -72,7 +72,7 @@ void	op_trestart_set_cdb_code(void)
 	t_fail_hist[t_tries] = cdb_sc_optrestart;
 }
 
-void	op_trestart(int newlevel)
+void CYGWIN64_ABI	op_trestart(int newlevel)
 {
 	error_def(ERR_TPRETRY);
 

@@ -33,7 +33,7 @@ GBLREF	unsigned short	lks_this_cmd;
 
 error_def(ERR_TPLOCK);
 
-void op_unlock(void)
+void CYGWIN64_ABI op_unlock(void)
 {
 	mlk_pvtblk 	**prior;
 	boolean_t	is_proc_exiting;

@@ -33,7 +33,7 @@
  *	the $T variable by the caller if timeout is specified.
  * -----------------------------------------------
  */
-int op_zallocate(mval *timeout)
+int CYGWIN64_ABI op_zallocate(mval *timeout)
 {
 
 	return op_lock2(timeout, CM_ZALLOCATES);

@@ -58,7 +58,7 @@ GBLREF spdesc			stringpool;
 
 /* op_gvorder should generally be maintained in parallel */
 
-void op_zprevious(mval *v)
+void CYGWIN64_ABI op_zprevious(mval *v)
 {
 	boolean_t		found, ok_to_change_currkey;
 	enum db_acc_method	acc_meth;

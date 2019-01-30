@@ -30,7 +30,7 @@ GBLREF	stack_frame		*frame_pointer;
 error_def(ERR_VAREXPECTED);
 
 /* note: not currently used anywhere */
-void	op_indlvadr(mval *target)
+void CYGWIN64_ABI 	op_indlvadr(mval *target)
 {
 	char		*ptr;
 	icode_str	indir_src;

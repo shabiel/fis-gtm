@@ -23,7 +23,7 @@ error_def(ERR_INDRMAXLEN);
 error_def(ERR_STRINGOFLOW);
 error_def(ERR_VAREXPECTED);
 
-void op_indname(mval *dst, mval *target, mval *subs)
+void CYGWIN64_ABI  op_indname(mval *dst, mval *target, mval *subs)
 {
 	int		i;
 	unsigned char	*out, *end, *start;

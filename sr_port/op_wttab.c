@@ -53,7 +53,7 @@ LITDEF unsigned char ebcdic_spaces_block[TAB_BUF_SZ] =
 GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
 
-void op_wttab(mint col)
+void CYGWIN64_ABI op_wttab(mint col)
 {
 	mstr		spaces;
 	int		delta;

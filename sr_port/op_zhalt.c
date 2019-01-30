@@ -56,7 +56,7 @@ error_def(ERR_PROCTERM);
 error_def(ERR_RESTRICTEDOP);
 
 /* Exit process with a return code, either given or defaulted by the ZHALT or implicitly 0 for HALT */
-void op_zhalt(int4 retcode, boolean_t is_zhalt)
+void CYGWIN64_ABI op_zhalt(int4 retcode, boolean_t is_zhalt)
 {
 	ABS_TIME		cur_time, interval;
 	GTMTRIG_ONLY(mval	zposition;)

@@ -16,7 +16,7 @@
 #include "mlk_pvtblk_create.h"
 #include "op.h"
 
-void	op_lkname(UNIX_ONLY_COMMA(int subcnt) mval *extgbl1, ...)
+void CYGWIN64_ABI	op_lkname(UNIX_ONLY_COMMA(int subcnt) mval *extgbl1, ...)
 {
 	VMS_ONLY(int subcnt;)
 	va_list	var;

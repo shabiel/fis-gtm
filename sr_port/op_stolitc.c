@@ -20,7 +20,7 @@
 
 GBLREF	stack_frame	*frame_pointer;
 
-void op_stolitc(mval *val)
+void CYGWIN64_ABI op_stolitc(mval *val)
 {
 #	ifdef USHBIN_SUPPORTED
 	assert(DYNAMIC_LITERALS_ENABLED(frame_pointer->rvector));

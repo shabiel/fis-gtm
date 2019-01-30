@@ -49,7 +49,7 @@ GBLREF spdesc		stringpool;
 
 error_def(ERR_IONOTOPEN);
 
-int op_rdone(mval *v, mval *timeout)
+int CYGWIN64_ABI op_rdone(mval *v, mval *timeout)
 {
 	char		*start_ptr,temp_buf[TMP_BUF_LEN];
 	int	x;

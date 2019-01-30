@@ -45,7 +45,7 @@ error_def(ERR_ZPRTLABNOTFND);
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLMODULE);
 
-void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label, int end_int_exp)
+void CYGWIN64_ABI op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label, int end_int_exp)
 /* contains label to be located or null string		*/
 /* contains label offset or line number to reference	*/
 /* contains routine to look in or null string		*/

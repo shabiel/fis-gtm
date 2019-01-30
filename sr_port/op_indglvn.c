@@ -29,7 +29,7 @@ GBLREF	bool			undef_inhibit;
 GBLREF	symval			*curr_symval;
 LITREF	mval			literal_null;
 
-void	op_indglvn(mval *v,mval *dst)
+void CYGWIN64_ABI 	op_indglvn(mval *v,mval *dst)
 {
 	ht_ent_mname	*tabent;
 	icode_str	indir_src;

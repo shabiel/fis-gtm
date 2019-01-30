@@ -22,7 +22,7 @@
 LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
 
-void	op_mul (mval *u, mval *v, mval *p)
+void CYGWIN64_ABI	op_mul (mval *u, mval *v, mval *p)
 {
 	bool		promo;
 	int4		c, exp;

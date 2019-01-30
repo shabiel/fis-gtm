@@ -13,7 +13,7 @@
 #include "mdef.h"
 #include "op.h"
 
-int op_open_dummy(mval *v, mval *p, mval *timeout, mval *mspace)
+int CYGWIN64_ABI op_open_dummy(mval *v, mval *p, mval *timeout, mval *mspace)
 {
 	return 0;
 }

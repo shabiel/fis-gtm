@@ -49,7 +49,7 @@ error_def(ERR_MERGEDESC);
  * returns 0 if src and dst keys of merge are identical (i.e. NOOP - merge self);
  * issues MERGEDESC error otherwise.
  */
-boolean_t merge_desc_check(void)
+boolean_t CYGWIN64_ABI merge_desc_check(void)
 {
 	boolean_t		intersect, *is_reg_in_array, mergereg_array[256];
 	char			*base;

@@ -28,7 +28,7 @@ error_def(ERR_NOCANONICNAME);
  * 2. Evaluate second argument --> 2
  * 3. Using the results of the previous two steps, do op_indfnname2 to remove extra subscripts --> "x(6,7)"
  */
-void op_indfnname2(mval *finaldst, mval *depthval, mval *prechomp)
+void CYGWIN64_ABI  op_indfnname2(mval *finaldst, mval *depthval, mval *prechomp)
 {
 	int	depth, dummy, start, subscripts;
 	char	*c;

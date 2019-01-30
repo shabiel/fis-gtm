@@ -11,7 +11,7 @@
 
 #ifndef OP_TCOMMIT_H_DEFINED
 
-enum cdb_sc	op_tcommit(void);
+enum cdb_sc CYGWIN64_ABI	op_tcommit(void);
 
 #define OP_TCOMMIT_H_DEFINED
 #endif

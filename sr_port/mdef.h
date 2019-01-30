@@ -674,7 +674,7 @@ int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[]
 #define	DBG_MARK_RTS_ERROR_UNUSABLE
 #endif
 
-int	rts_error(int argcnt, ...)			CLANG_SCA_ANALYZER_NORETURN;
+int CYGWIN64_ABI	rts_error(int argcnt, ...)			CLANG_SCA_ANALYZER_NORETURN;
 int	rts_error_csa(void *csa, int argcnt, ...)	CLANG_SCA_ANALYZER_NORETURN;	/* Use CSA_ARG(CSA) for portability */
 #define CSA_ARG(CSA)	(CSA),
 void	dec_err(uint4 argcnt, ...);

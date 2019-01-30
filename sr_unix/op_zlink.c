@@ -113,7 +113,7 @@ ZOS_ONLY(error_def(ERR_BADTAG);)
  *   - v     - mval containing the name/path of the object file.
  *   - quals - mval containing the ZLINK command options (see GT.M User's Guide).
  */
-void op_zlink (mval *v, mval *quals)
+void CYGWIN64_ABI op_zlink (mval *v, mval *quals)
 {
 	int			status, qlf, tslash, save_errno;
 	linktyp			type;

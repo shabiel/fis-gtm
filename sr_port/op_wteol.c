@@ -17,7 +17,7 @@
 GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
 
-void op_wteol(int4 n)
+void CYGWIN64_ABI op_wteol(int4 n)
 {
 	io_desc		*iod;
 	iod = io_curr_device.out;

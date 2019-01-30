@@ -28,7 +28,7 @@ GBLREF	symval			*curr_symval;
 
 error_def(ERR_VAREXPECTED);
 
-void	op_indset(mval *target, mval *value)
+void CYGWIN64_ABI 	op_indset(mval *target, mval *value)
 {
 	char 		new;
 	ht_ent_mname 	*tabent;

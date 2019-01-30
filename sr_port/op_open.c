@@ -65,7 +65,7 @@ error_def(ERR_TEXT);
 
 #define OPENTIMESTR "OPEN"
 
-int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
+int CYGWIN64_ABI op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 {
 	char		buf1[MAX_TRANS_NAME_LEN];	/* buffer to hold translated name */
 	char		*c1;				/* used to compare $P name */

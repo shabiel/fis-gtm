@@ -43,7 +43,7 @@ error_def(ERR_ZGOTOINVLVL2);
 error_def(ERR_ZGOTOLTZERO);
 error_def(ERR_ZGOTOTOOBIG);
 
-void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
+void CYGWIN64_ABI op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 {
 	stack_frame	*fp, *fpprev;
 	int4		curlvl;

@@ -232,7 +232,7 @@ boolean_t clean_mum_tstart(void)
 	return (NULL != err_act);
 }
 
-CONDITION_HANDLER(mdb_condition_handler)
+CONDITION_HANDLER(CYGWIN64_ABI mdb_condition_handler)
 {
 	unsigned char		*cp, *context;
 	boolean_t		dm_action;	/* did the error occur on a action from direct mode */

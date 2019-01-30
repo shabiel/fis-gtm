@@ -30,7 +30,7 @@ GBLREF mcalloc_hdr 		*mcavailptr;
 
 #define FILE_NAME_SIZE 255
 
-void op_zcompile(mval *v, boolean_t ignore_dollar_zcompile)
+void CYGWIN64_ABI op_zcompile(mval *v, boolean_t ignore_dollar_zcompile)
 {
 	unsigned		status;
 	command_qualifier	save_qlf;

@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "op.h"
 
-void op_iretmval(mval *v, mval *dst)
+void CYGWIN64_ABI  op_iretmval(mval *v, mval *dst)
 {
 	DCL_THREADGBL_ACCESS;
 

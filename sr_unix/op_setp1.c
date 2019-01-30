@@ -49,7 +49,7 @@ error_def(ERR_MAXSTRLEN);
  *	none
  * ----------------------------------------------------------
  */
-void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
+void CYGWIN64_ABI op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 {
 	size_t		str_len, delim_cnt;
 	int		len, pfx_str_len, sfx_start_offset, sfx_str_len, rep_str_len, pfx_scan_offset;

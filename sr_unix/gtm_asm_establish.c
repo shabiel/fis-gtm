@@ -12,13 +12,13 @@
 
 #include "error.h"			/* Declares all needed globals */
 
-void gtm_asm_establish(void);		/* Only needs to be declared here as is only called from assembler routines */
+void CYGWIN64_ABI gtm_asm_establish(void);		/* Only needs to be declared here as is only called from assembler routines */
 
 /* This routine is called from assembler routines (basically dm_start) who need to do an ESTABLISH. We do all of the ESTABLISH
  * here except for the actual setjmp() call which needs to be in the assembler macro itself.
  */
 
-void gtm_asm_establish(void)
+void CYGWIN64_ABI gtm_asm_establish(void)
 {
 	GTM_ASM_ESTABLISH;
 }

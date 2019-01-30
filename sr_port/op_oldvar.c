@@ -23,7 +23,7 @@
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*msp;
 
-void op_oldvar(void)
+void CYGWIN64_ABI op_oldvar(void)
 {
 	assert(msp == (unsigned char *)mv_chain);
 	assert(MVST_TRIGR != mv_chain->mv_st_type);	/* Should never unwind a trigger frame here */

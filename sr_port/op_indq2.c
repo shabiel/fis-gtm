@@ -34,7 +34,7 @@ GBLREF	symval			*curr_symval;
 LITREF	mval	literal_one;
 LITREF	mval	literal_minusone;
 
-void	op_indq2(mval *dst, uint4 indx, mval *direct)
+void CYGWIN64_ABI 	op_indq2(mval *dst, uint4 indx, mval *direct)
 {
 	int		i;
 	glvn_pool_entry	*slot;

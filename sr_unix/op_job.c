@@ -95,7 +95,7 @@ void	job_timer_handler(void)
  * Job command main entry point
  * ---------------------------------------------------
  */
-int	op_job(int4 argcnt, ...)
+int CYGWIN64_ABI 	op_job(int4 argcnt, ...)
 {
 	va_list			var;
 	int4			i;

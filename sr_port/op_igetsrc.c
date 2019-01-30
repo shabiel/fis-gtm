@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "op.h"
 
-void op_igetsrc(mval *v)
+void CYGWIN64_ABI  op_igetsrc(mval *v)
 {
 	DCL_THREADGBL_ACCESS;
 

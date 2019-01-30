@@ -35,7 +35,7 @@ error_def(ERR_MAXSTRLEN);
  *	none
  * ----------------------------------------------------------
  */
-void op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst)
+void CYGWIN64_ABI op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 {
 	size_t		strlen, padlen;
 	int		pfxlen, sfxoff, sfxlen, srclen;

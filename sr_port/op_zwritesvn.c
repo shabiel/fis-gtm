@@ -23,7 +23,7 @@
 #include "gtm_maxstr.h"
 #include "op.h"
 
-void op_zwritesvn(int svn)
+void CYGWIN64_ABI op_zwritesvn(int svn)
 {
   	zshow_out	output;
 	MAXSTR_BUFF_DECL(buff);

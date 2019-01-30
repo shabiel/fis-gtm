@@ -30,7 +30,7 @@ GBLREF mval 		zstep_action;
 GBLREF int4		gtm_trigger_depth;
 #endif
 
-void op_zst_break(void)
+void CYGWIN64_ABI op_zst_break(void)
 {
 	assert((0 == gtm_trigger_depth) || !RESTRICTED(trigger_mod));
 	FIX_XFER_ENTRY(xf_linefetch, op_linefetch);

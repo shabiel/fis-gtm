@@ -19,7 +19,7 @@ GBLREF bool 		neterr_pending;
 GBLREF int4 		outofband;
 GBLREF int 		iott_write_error;
 
-void op_zst_over(void)
+void CYGWIN64_ABI op_zst_over(void)
 {
 	if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
 	{

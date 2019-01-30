@@ -111,7 +111,7 @@ CONDITION_HANDLER(iob_io_error);
 CONDITION_HANDLER(jnl_file_autoswitch_ch);
 CONDITION_HANDLER(job_init_ch);
 CONDITION_HANDLER(jobexam_dump_ch);
-CONDITION_HANDLER(mdb_condition_handler);
+CONDITION_HANDLER(CYGWIN64_ABI mdb_condition_handler);
 CONDITION_HANDLER(mu_freeze_ch);
 CONDITION_HANDLER(mu_int_ch);
 CONDITION_HANDLER(mu_int_reg_ch);

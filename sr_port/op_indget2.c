@@ -21,7 +21,7 @@
 error_def(ERR_ORDER2);
 error_def(ERR_VAREXPECTED);
 
-void	op_indget2(mval *dst, uint4 indx)
+void CYGWIN64_ABI 	op_indget2(mval *dst, uint4 indx)
 {
 	glvn_pool_entry	*slot;
 	lv_val		*lv;

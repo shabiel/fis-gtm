@@ -53,7 +53,7 @@ error_def(ERR_RDFLTOOSHORT);
 error_def(ERR_RDFLTOOLONG);
 error_def(ERR_TEXT);
 
-int op_readfl(mval *v, int4 length, mval *timeout)
+int CYGWIN64_ABI op_readfl(mval *v, int4 length, mval *timeout)
 {
 	char		*start_ptr, *save_ptr;
 	int		b_length;

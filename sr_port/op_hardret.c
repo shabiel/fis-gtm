@@ -20,7 +20,7 @@
 
 GBLREF stack_frame	*frame_pointer;
 
-void	op_hardret(void)
+void CYGWIN64_ABI 	op_hardret(void)
 {
 	bool		dmode;
 

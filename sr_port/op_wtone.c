@@ -24,7 +24,7 @@ GBLREF spdesc		stringpool;
 static size_t		insize;
 static size_t		outsize;
 
-void op_wtone(int c)
+void CYGWIN64_ABI op_wtone(int c)
 {
 	char	temp_ch[1];
 	char	*start_ptr;

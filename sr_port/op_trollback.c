@@ -73,7 +73,7 @@ error_def(ERR_INVROLLBKLVL);
 	jnlpool = save_jnlpool;						\
 }
 
-void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by which we need to rollback : BYPASSOK */
+void CYGWIN64_ABI	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by which we need to rollback : BYPASSOK */
 {
 	boolean_t	lcl_implicit_trollback = FALSE, reg_reset;
 	uint4		newlevel;

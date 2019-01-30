@@ -37,7 +37,7 @@ GBLREF  zwr_hash_table  *zwrhtab;
 
 LITREF  mstr    	dzwrtac_clean;
 
-void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...)
+void CYGWIN64_ABI op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...)
 {
 	va_list		var;
 	boolean_t	flag;

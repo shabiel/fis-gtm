@@ -183,7 +183,7 @@ STATICFNDEF void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm
 	return;
 }
 
-enum cdb_sc	op_tcommit(void)
+enum cdb_sc CYGWIN64_ABI 	op_tcommit(void)
 {
 	boolean_t		blk_used, is_mm, was_crit;
 	sm_uc_ptr_t		bmp;

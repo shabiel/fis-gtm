@@ -21,7 +21,7 @@
 
 error_def(ERR_VAREXPECTED);
 
-void op_indrzshow(mval *s1, mval *s2)
+void CYGWIN64_ABI  op_indrzshow(mval *s1, mval *s2)
 {
 	icode_str	indir_src;
 	int		rval;

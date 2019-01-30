@@ -92,7 +92,7 @@ error_def(ERR_SYSCALL);
  *	none
  * ------------------------------------------
  */
-void op_hang(mval* num)
+void CYGWIN64_ABI  op_hang(mval* num)
 {
 	int		ms;
 #	ifdef DEBUG

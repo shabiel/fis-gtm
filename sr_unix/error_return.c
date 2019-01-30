@@ -40,7 +40,7 @@ GBLREF	mval			dollar_zstatus;
 error_def(ERR_JIUNHNDINT);
 error_def(ERR_REPEATERROR);
 
-void error_return(void)
+void CYGWIN64_ABI error_return(void)
 {
 	int		parent_level, unwcnt;
 	stack_frame	*curframe, *cur_counted_frame, *parent_counted_frame;

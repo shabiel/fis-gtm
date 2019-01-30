@@ -95,7 +95,7 @@ error_def(ERR_SYSTEMVALUE);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_ZTWORMHOLE2BIG);
 
-void op_svput(int varnum, mval *v)
+void CYGWIN64_ABI op_svput(int varnum, mval *v)
 {
 	int	i, ok, state;
 	char	*vptr;

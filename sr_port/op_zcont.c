@@ -18,7 +18,7 @@
 
 GBLREF stack_frame *frame_pointer;
 
-void	op_zcont(void)
+void CYGWIN64_ABI	op_zcont(void)
 {
 	short		unwind;
 	stack_frame	*fp;

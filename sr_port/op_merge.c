@@ -94,7 +94,7 @@ error_def(ERR_NCTCOLLDIFF);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 
-void op_merge(void)
+void CYGWIN64_ABI op_merge(void)
 {
 	boolean_t		found, check_for_null_subs, is_base_var, nontp_and_bgormm, nospan, act_mismatch;
 	lv_val			*dst_lv;

@@ -30,7 +30,7 @@ GBLREF	seq_num			seq_num_zero;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	jnl_gbls_t		jgbl;
 
-void	op_ztstart(void)
+void CYGWIN64_ABI	op_ztstart(void)
 {
 	if (dollar_tlevel)
 		rts_error(VARLSTCNT(4) ERR_TPMIXUP, 2, "A fenced logical", "an M");

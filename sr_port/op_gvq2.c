@@ -31,7 +31,7 @@ LITREF	mval	literal_minusone;
  * In this case, "f_query" generates an OC_GVQ2 opcode that invokes "op_gvq2" with the direction parameter evaluated
  * and so we can now decide whether to go with forward or reverse query of gvn.
  */
-void op_gvq2(mval *dst, mval *direct)
+void CYGWIN64_ABI  op_gvq2(mval *dst, mval *direct)
 {
 	int4	dummy_intval;
 

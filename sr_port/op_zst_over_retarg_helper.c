@@ -26,7 +26,7 @@ GBLREF stack_frame	*frame_pointer;
  * We achieve this by modifying the global "zstep_level" to the uncounted frame (that is the check done by
  * "op_zst_over_retarg" (in op_bkpt.s) to decide whether "op_zstepret" or "op_retarg" needs to be invoked.
  */
-void	op_zst_over_retarg_helper(void)
+void CYGWIN64_ABI	op_zst_over_retarg_helper(void)
 {
 	stack_frame	*fp;
 

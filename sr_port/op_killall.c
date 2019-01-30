@@ -17,7 +17,7 @@
 GBLREF symval *curr_symval;
 
 /* Note similar code exists in op_xkill which excepts some records */
-void op_killall(void)
+void CYGWIN64_ABI  op_killall(void)
 {
 	ht_ent_mname	*sym, *top;
 	lv_val		*lv;

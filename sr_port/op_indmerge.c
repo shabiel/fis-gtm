@@ -36,7 +36,7 @@
 
 error_def(ERR_VAREXPECTED);
 
-void op_indmerge(mval *glvn_mv, mval *arg1_or_arg2)
+void CYGWIN64_ABI  op_indmerge(mval *glvn_mv, mval *arg1_or_arg2)
 {
 	boolean_t	leftarg;
 	icode_str	indir_src;

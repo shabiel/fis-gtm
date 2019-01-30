@@ -37,7 +37,7 @@ LITDEF MSTR_CONST(literal_wait, "WAIT");
 
 error_def(ERR_CTLMNEMAXLEN);
 
-void op_iocontrol(UNIX_ONLY_COMMA(int4 n) mval *vparg, ...)
+void CYGWIN64_ABI  op_iocontrol(UNIX_ONLY_COMMA(int4 n) mval *vparg, ...)
 {
 	va_list		var;
 	VMS_ONLY(int	n;)

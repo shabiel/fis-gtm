@@ -66,7 +66,7 @@ error_def(ERR_RESTRICTEDOP);
 error_def(ERR_SYSCALL);
 error_def(ERR_COMMFILTERERR);
 
-void op_zsystem(mval *v)
+void CYGWIN64_ABI op_zsystem(mval *v)
 {
 	char		*cmd_buf = NULL;
 #ifdef _BSD

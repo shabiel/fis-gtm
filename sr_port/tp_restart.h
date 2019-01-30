@@ -25,7 +25,7 @@
 #define	TPWRAP_HELPER_MAX_ATTEMPTS	16	/* maximum # of iterations allowed to avoid indefinite tp restart loop */
 
 /* Helper function */
-void	op_trestart_set_cdb_code(void);
+void CYGWIN64_ABI	op_trestart_set_cdb_code(void);
 
 int tp_restart(int newlevel, boolean_t handle_errors_internally);
 

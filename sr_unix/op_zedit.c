@@ -44,7 +44,7 @@ error_def(ERR_NOEDITOR);
 error_def(ERR_ZEDFILSPEC);
 error_def(ERR_RESTRICTEDOP);
 
-void op_zedit(mval *v, mval *p)
+void CYGWIN64_ABI op_zedit(mval *v, mval *p)
 {
 	char		*edt;
 	char		es[MAX_FBUFF + 1], typ, *ptr;

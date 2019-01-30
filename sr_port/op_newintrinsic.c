@@ -47,7 +47,7 @@ error_def(ERR_NOZTRAPINTRIG);
    reload the stack pointers to the M stackframe. This is normally taken care of
    by opp_newintrinsic().
 */
-void op_newintrinsic(int intrtype)
+void CYGWIN64_ABI op_newintrinsic(int intrtype)
 {
 	mval		*intrinsic;
 	boolean_t	stored_explicit_null, etrap_was_active;

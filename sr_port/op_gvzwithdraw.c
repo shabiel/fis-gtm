@@ -50,7 +50,7 @@ error_def(ERR_PCTYRESERVED);
 
 void with_var(void);
 
-void op_gvzwithdraw(void)
+void CYGWIN64_ABI  op_gvzwithdraw(void)
 {
 	gd_region	*reg;
 	DCL_THREADGBL_ACCESS;

@@ -21,7 +21,7 @@
 
 error_def(ERR_VAREXPECTED);
 
-void	op_indlvarg(mval *v, mval *dst)
+void CYGWIN64_ABI 	op_indlvarg(mval *v, mval *dst)
 {
 	icode_str	indir_src;
 	int		rval;

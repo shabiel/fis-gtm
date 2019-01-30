@@ -48,7 +48,7 @@ error_def(ERR_ZGOTOINVLVL);
 error_def(ERR_ZGOTOLTZERO);
 error_def(ERR_ZGOTOTOOBIG);
 
-void op_zg1(int4 level)
+void CYGWIN64_ABI op_zg1(int4 level)
 {
 	stack_frame	*fp, *fpprev;
 	int4		curlvl, exi_cond, unwframes, unwlevels, unwtrglvls;

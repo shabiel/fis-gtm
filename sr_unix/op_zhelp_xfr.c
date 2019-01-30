@@ -25,7 +25,7 @@ static mval dlib 	= DEFINE_MVAL_STRING(MV_STR, 0 , 0 , SIZEOF("$ydb_dist/gtmhelp
 
 GBLREF spdesc stringpool;
 
-void op_zhelp_xfr(mval *subject, mval *lib)
+void CYGWIN64_ABI op_zhelp_xfr(mval *subject, mval *lib)
 {
 	mstr	x;
 	mval	*action;

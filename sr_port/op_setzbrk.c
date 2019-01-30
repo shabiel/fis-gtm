@@ -66,7 +66,7 @@ error_def(ERR_ZBREAKFAIL);
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLMODULE);
 
-void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
+void CYGWIN64_ABI	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 	/* act == action associated with ZBREAK */
 	/* cnt == perform break after this many passes */
 {

@@ -40,7 +40,7 @@ GBLREF stack_frame		*frame_pointer;
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 
-void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
+void CYGWIN64_ABI  op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 {
 	icode_str	indir_src;
 	int		rval;

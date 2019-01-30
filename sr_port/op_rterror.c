@@ -14,7 +14,7 @@
 
 error_def(ERR_LABELNOTFND);
 
-void op_rterror(int4 sig, boolean_t subrtn)
+void CYGWIN64_ABI op_rterror(int4 sig, boolean_t subrtn)
 {
 	/* If this module is called as an M subroutine, the message we generate will not have the correct M line-of-code reference
 	 * because (1) we have already created the stackframe for the subroutine call we are not now going to make and (2) the code

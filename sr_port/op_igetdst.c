@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "op.h"
 
-mval *op_igetdst(void)
+mval CYGWIN64_ABI  *op_igetdst(void)
 {
 	DCL_THREADGBL_ACCESS;
 

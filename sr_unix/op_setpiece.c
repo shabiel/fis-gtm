@@ -47,7 +47,7 @@ error_def(ERR_MAXSTRLEN);
  *	none
  * ----------------------------------------------------------
  */
-void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst)
+void CYGWIN64_ABI op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst)
 {
 	size_t		str_len, delim_cnt;
 	int 		match_res, len, src_len, first_src_ind, second_src_ind, numpcs;

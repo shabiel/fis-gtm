@@ -53,7 +53,7 @@ error_def(ERR_TEXT);
 
 #ifndef AUTORELINK_SUPPORTED
 /* Stub routine for unsupported platforms */
-void op_zrupdate(int argcnt, ...)
+void CYGWIN64_ABI op_zrupdate(int argcnt, ...)
 {
 	return;
 }
@@ -74,7 +74,7 @@ void op_zrupdate(int argcnt, ...)
  *
  * No return value.
  */
-void op_zrupdate(int argcnt, ...)
+void CYGWIN64_ABI op_zrupdate(int argcnt, ...)
 {
 	boolean_t		wildcarded, noresult, seenfext, invalid;
 	char			pblkbuf[MAX_FBUFF + 1], statbuf[MAX_FBUFF + 1], namebuf[MAX_FBUFF + 1];

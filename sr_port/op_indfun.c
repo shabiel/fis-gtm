@@ -26,7 +26,7 @@ static readonly opctype indir_opcode[] = {
 };
 #undef INDIR
 
-void op_indfun(mval *v, mint argcode, mval *dst)
+void CYGWIN64_ABI  op_indfun(mval *v, mint argcode, mval *dst)
 {
 	icode_str	indir_src;
 	int		rval;

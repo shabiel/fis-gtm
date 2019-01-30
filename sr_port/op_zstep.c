@@ -32,7 +32,7 @@ GBLREF int4		outofband;
 GBLREF int		iott_write_error;
 GBLREF int4		gtm_trigger_depth;
 
-void op_zstep(uint4 code, mval *action)
+void CYGWIN64_ABI op_zstep(uint4 code, mval *action)
 {
 	stack_frame	*fp;
 	int4		status;

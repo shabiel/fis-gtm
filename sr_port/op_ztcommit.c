@@ -44,7 +44,7 @@ error_def(ERR_REPLOFFJNLON);
 error_def(ERR_TRANSMINUS);
 error_def(ERR_TRANSNOSTART);
 
-void    op_ztcommit(int4 n)
+void CYGWIN64_ABI    op_ztcommit(int4 n)
 {
 	boolean_t			replication, yes_jnl_no_repl;
 	uint4				jnl_status;

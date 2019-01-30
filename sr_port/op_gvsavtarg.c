@@ -37,7 +37,7 @@ GBLREF	spdesc		stringpool;
 GBLREF  uint4           dollar_tlevel;
 GBLREF	sgm_info	*first_sgm_info, *sgm_info_ptr;
 
-void op_gvsavtarg(mval *v)
+void CYGWIN64_ABI  op_gvsavtarg(mval *v)
 {
 	int			len, align_len;
 	unsigned char		*c;

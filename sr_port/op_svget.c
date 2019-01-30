@@ -127,7 +127,7 @@ LITREF int4		ydb_release_stamp_len;
 LITREF char		ydb_release_name[];
 LITREF int4		ydb_release_name_len;
 
-void op_svget(int varnum, mval *v)
+void CYGWIN64_ABI op_svget(int varnum, mval *v)
 {
 	io_log_name	*tl;
 	int 		count;

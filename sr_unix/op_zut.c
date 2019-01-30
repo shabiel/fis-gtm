@@ -22,7 +22,7 @@ LITREF	int4	ten_pwr[];
 
 error_def(ERR_WEIRDSYSTIME);
 
-void op_zut(mval *s)
+void CYGWIN64_ABI op_zut(mval *s)
 {
 	struct timeval	tv;
 	gtm_int8	microseconds, msectmp;

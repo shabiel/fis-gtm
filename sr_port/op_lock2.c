@@ -140,7 +140,7 @@ STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr)
  *	the $T variable by the caller if timeout is specified.
  * -----------------------------------------------
  */
-int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
+int CYGWIN64_ABI	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 {
 	boolean_t		blocked, timer_on;
 	signed char		gotit;
